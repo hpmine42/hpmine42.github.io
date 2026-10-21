@@ -8,15 +8,14 @@ import { useReducedMotion } from '../composables/useReducedMotion'
   in on straight horizontal lines from the left, released in a wave from
   left to right so the word assembles letter by letter, each dot flashing
   signal blue as it locks into place (about 2 seconds in total). The
-  pointer dents the field along the straight segment it swept, so its wake
-  is a straight band of constant width that ends cleanly rather than an
-  eye-shaped trail tapering to a point: background dots give way freely,
-  but text dots only yield a little against a stiffer spring and a hard
-  displacement cap, so the word stays readable while you drag across it.
-  Displaced dots swell slightly, keep a brief signal afterglow, and a
-  click or tap sends a ripple ring through the field. The
-  animation loop only runs while something is moving, and never while the
-  canvas is off screen.
+  pointer is simply a soft round circle of influence that follows the
+  real pointer with a slight lag, as if pulled behind it: dots inside
+  the circle give way radially — background dots freely, text dots only
+  a little against a stiffer spring and a hard displacement cap, so the
+  word stays readable while you drag across it. Displaced dots swell
+  slightly and keep a brief signal afterglow. The animation loop only
+  runs while something is moving, and never while the canvas is off
+  screen.
 */
 
 const props = defineProps<{ text: string }>()
@@ -52,13 +51,6 @@ interface Grid {
   delay: Float32Array
 }
 
-interface Ripple {
-  x: number
-  y: number
-  r: number
-  strength: number
-}
-
 let grid: Grid | null = null
 let ctx: CanvasRenderingContext2D | null = null
 let host: HTMLElement | null = null
@@ -75,11 +67,9 @@ let visibilityObserver: IntersectionObserver | null = null
 let colorDim = '#2b3036'
 let colorText = '#e9e7e2'
 let colorSignal = '#8aa2ff'
-/* x/y is the smoothed position the physics uses, tx/ty the raw target,
-   px/py the smoothed position of the previous frame: together they form
-   the straight segment the pointer swept since the last frame. */
-const pointer = { x: -9999, y: -9999, tx: -9999, ty: -9999, px: -9999, py: -9999, active: false }
-const ripples: Ripple[] = []
+/* x/y is the lagging circle position the physics uses, tx/ty the raw
+   pointer target it eases toward. */
+const pointer = { x: -9999, y: -9999, tx: -9999, ty: -9999, active: false }
 /** performance.now() timestamp of the intro assembly (0 = no intro running). */
 let introStart = 0
 
@@ -285,42 +275,32 @@ function step(now: number): void {
   const dt = Math.min(2, (now - lastTime) / 16.667 || 1)
   lastTime = now
 
-  // Glide the smoothed pointer toward the raw target. The segment from the
-  // previous smoothed position to the new one is this frame's swept path.
-  pointer.px = pointer.x
-  pointer.py = pointer.y
+  // Ease the influence circle toward the pointer: it covers only about a
+  // fifth of the remaining distance per frame, so the circle visibly
+  // trails a little behind the finger/mouse and swings smoothly along.
   if (pointer.active) {
-    const glide = 1 - Math.pow(0.6, dt)
+    const glide = 1 - Math.pow(0.78, dt)
     pointer.x += (pointer.tx - pointer.x) * glide
     pointer.y += (pointer.ty - pointer.y) * glide
   }
-  const segX = pointer.x - pointer.px
-  const segY = pointer.y - pointer.py
-  const segLenSq = segX * segX + segY * segY
 
-  // The pointer acts on the whole swept segment at once, not on one round
-  // point: the influence zone is a capsule of constant width around the
-  // segment (like a ruler laid along the path). The wake behind the pointer
-  // therefore has straight, parallel edges and a fixed width — the old
-  // round push made a lens/eye shape whose blue trail tapered to a weird
-  // point where the older, weaker pushes had decayed further.
-  const radius = Math.max(52, Math.min(72, width * 0.07))
+  const radius = Math.max(56, Math.min(76, width * 0.075))
+  const radiusSq = radius * radius
   const damping = Math.pow(DAMPING, dt)
   const dampingText = Math.pow(DAMPING_TEXT, dt)
-  // Fast fade: the blue afterglow ends cleanly instead of stretching into
-  // a long tapering tail behind the pointer.
-  const glowDecay = Math.pow(0.88, dt)
-  const maxDist = Math.hypot(width, height)
+  // Fast fade, so the blue stays with the moving circle instead of
+  // stretching into a tail behind it.
+  const glowDecay = Math.pow(0.86, dt)
   const introElapsed = introStart > 0 ? now - introStart : Number.POSITIVE_INFINITY
   // The intro is over after ~3.5s at the latest, even if the pointer keeps
   // the field busy: from then on the readability caps apply.
   if (introElapsed > 3500) introStart = 0
-  let moving = ripples.length > 0
+  let moving = false
   let displaced = false
 
   for (let i = 0; i < g.count; i += 1) {
     // Intro: hold each dot at its starting position until its wave moment,
-    // then release it with a flash. Pointer and ripples cannot disturb a
+    // then release it with a flash. The pointer cannot disturb a
     // dot that has not been released yet.
     const delay = g.delay[i] ?? -1
     if (delay >= 0) {
@@ -341,33 +321,14 @@ function step(now: number): void {
     let vy = g.vy[i] ?? 0
 
     if (pointer.active) {
-      // Closest point on the swept segment: pushing away from it shoves
-      // dots perpendicular to the path, leaving a straight wake.
-      const relX = (g.baseX[i] ?? 0) + dx - pointer.px
-      const relY = (g.baseY[i] ?? 0) + dy - pointer.py
-      const along = segLenSq > 0.01 ? Math.min(1, Math.max(0, (relX * segX + relY * segY) / segLenSq)) : 0
-      const ex = relX - segX * along
-      const ey = relY - segY * along
-      const dist = Math.hypot(ex, ey)
-      if (dist < radius && dist > 0.01) {
-        // Flat core, short falloff at the edge: the wake has a uniform
-        // width along its whole length instead of pinching shut.
-        const strength = Math.min(1, (1 - dist / radius) * 2.4)
-        const push = strength * 2.7 * give * dt
-        vx += (ex / dist) * push
-        vy += (ey / dist) * push
-      }
-    }
-
-    // An expanding ripple ring shoves dots outward as it passes over them.
-    for (const ripple of ripples) {
-      const ex = (g.baseX[i] ?? 0) + dx - ripple.x
-      const ey = (g.baseY[i] ?? 0) + dy - ripple.y
-      const dist = Math.hypot(ex, ey)
-      const off = Math.abs(dist - ripple.r)
-      const band = 52
-      if (dist > 0.01 && off < band) {
-        const push = (1 - off / band) * ripple.strength * 2.6 * give * dt
+      // Plain radial push around the lagging circle.
+      const ex = (g.baseX[i] ?? 0) + dx - pointer.x
+      const ey = (g.baseY[i] ?? 0) + dy - pointer.y
+      const distSq = ex * ex + ey * ey
+      if (distSq < radiusSq && distSq > 0.01) {
+        const dist = Math.sqrt(distSq)
+        const strength = 1 - dist / radius
+        const push = strength * strength * 2.9 * give * dt
         vx += (ex / dist) * push
         vy += (ey / dist) * push
       }
@@ -412,14 +373,6 @@ function step(now: number): void {
 
   if (introStart > 0 && !moving) introStart = 0
 
-  for (let i = ripples.length - 1; i >= 0; i -= 1) {
-    const ripple = ripples[i]
-    if (!ripple) continue
-    ripple.r += 9.5 * dt
-    ripple.strength *= Math.pow(0.985, dt)
-    if (ripple.r > maxDist || ripple.strength < 0.05) ripples.splice(i, 1)
-  }
-
   if (!moving && !displaced) {
     g.dx.fill(0)
     g.dy.fill(0)
@@ -448,19 +401,8 @@ function updatePointer(event: PointerEvent): void {
     // Snap on entry so the field does not sweep in from the last visit.
     pointer.x = pointer.tx
     pointer.y = pointer.ty
-    pointer.px = pointer.tx
-    pointer.py = pointer.ty
   }
   pointer.active = true
-  kick()
-}
-
-function pressPointer(event: PointerEvent): void {
-  updatePointer(event)
-  if (reduced.value || !visible) return
-  // A click or tap rings the field like a struck surface.
-  ripples.push({ x: pointer.tx, y: pointer.ty, r: 0, strength: 1 })
-  if (ripples.length > 3) ripples.shift()
   kick()
 }
 
@@ -481,7 +423,6 @@ function scheduleRebuild(): void {
 watch(reduced, () => {
   if (!grid) return
   pointer.active = false
-  ripples.length = 0
   build(false)
 })
 
@@ -502,7 +443,7 @@ onMounted(async () => {
   build(!reduced.value)
 
   host.addEventListener('pointermove', updatePointer)
-  host.addEventListener('pointerdown', pressPointer)
+  host.addEventListener('pointerdown', updatePointer)
   host.addEventListener('pointerleave', releasePointer)
   host.addEventListener('pointercancel', releasePointer)
 
@@ -527,7 +468,7 @@ onBeforeUnmount(() => {
   resizeObserver?.disconnect()
   visibilityObserver?.disconnect()
   host?.removeEventListener('pointermove', updatePointer)
-  host?.removeEventListener('pointerdown', pressPointer)
+  host?.removeEventListener('pointerdown', updatePointer)
   host?.removeEventListener('pointerleave', releasePointer)
   host?.removeEventListener('pointercancel', releasePointer)
 })
