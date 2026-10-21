@@ -1,0 +1,76 @@
+/*
+  Design tokens.
+  Palette: ink (graphite surfaces), bone (type on ink), paper (enough. scene),
+  signal (the single brand accent: caret, period, focus) and amber (Aiko only).
+*/
+:root {
+  /* Surfaces and type */
+  --ink: #0f100d;
+  --ink-raised: #171814;
+  --ink-line: #2c2d28;
+  --bone: #ece9e1;
+  --bone-dim: #9a978d;
+
+  --paper: #ece9e1;
+  --paper-text: #11120f;
+  --paper-dim: #5b5950;
+  --paper-line: #c4c0b4;
+
+  /* Accents */
+  --signal: #ff5a2c;
+  --signal-deep: #b8360f;
+  --amber: #f0b23a;
+  --amber-dim: #a08142;
+  --amber-wash: rgb(240 178 58 / 0.07);
+
+  /* Type */
+  --font-sans: 'Schibsted Grotesk Variable', 'Schibsted Grotesk', ui-sans-serif, system-ui,
+    -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono Variable', 'JetBrains Mono', ui-monospace, 'SFMono-Regular',
+    Menlo, Consolas, monospace;
+
+  --text-ui: 0.875rem;
+  --text-body: 1rem;
+  --text-lede: clamp(1.125rem, 1rem + 0.55vw, 1.4rem);
+  --text-h3: clamp(1.4rem, 1.1rem + 1.2vw, 2.1rem);
+  --text-title: clamp(4rem, 1rem + 13vw, 13rem);
+  --text-display: clamp(5rem, 1rem + 20vw, 19rem);
+
+  /* Space */
+  --s-1: 0.5rem;
+  --s-2: 0.75rem;
+  --s-3: 1rem;
+  --s-4: 1.5rem;
+  --s-5: 2.5rem;
+  --s-6: 4rem;
+  --s-7: clamp(5rem, 3rem + 8vw, 10rem);
+  --gutter: clamp(1.25rem, 0.75rem + 3vw, 3.5rem);
+  --max: 92rem;
+  --nav-h: 3.5rem;
+
+  /* Motion */
+  --ease-out: cubic-bezier(0.16, 0.84, 0.24, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --dur-fast: 180ms;
+  --dur-mid: 420ms;
+  --dur-scene: 700ms;
+
+  /* Scene variables: switched by the active section (see App.vue) */
+  --scene-bg: var(--ink);
+  --scene-fg: var(--bone);
+  --scene-muted: var(--bone-dim);
+  --scene-line: var(--ink-line);
+  --scene-accent: var(--signal);
+}
+
+:root[data-scene='enough'] {
+  --scene-bg: var(--paper);
+  --scene-fg: var(--paper-text);
+  --scene-muted: var(--paper-dim);
+  --scene-line: var(--paper-line);
+  --scene-accent: var(--signal-deep);
+}
+
+:root[data-scene='aiko'] {
+  --scene-accent: var(--amber);
+}
