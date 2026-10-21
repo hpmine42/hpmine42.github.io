@@ -1,6 +1,6 @@
 # hpmine42.github.io
 
-Portfolio of Jakob, built with Vue 3, TypeScript and Vite. Live at <https://hpmine42.github.io/>.
+Portfolio of hpmine42, built with Vue 3, TypeScript and Vite. Live at <https://hpmine42.github.io/>.
 
 The page has three parts: a dot-matrix hero, the project **enough.** and the project **Aiko**. Everything is in English and kept deliberately short.
 

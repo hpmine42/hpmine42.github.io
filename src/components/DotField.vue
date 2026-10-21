@@ -5,8 +5,11 @@ import { useReducedMotion } from '../composables/useReducedMotion'
 /*
   A field of dots. The dots that fall inside the rendered text are larger and
   brighter, so the word is drawn in dot-matrix. The pointer pushes dots away
-  and springs bring them back. The animation loop only runs while something is
-  moving, and never while the canvas is off screen.
+  and springs bring them back. The pointer is smoothed and speed-aware: a
+  fast swipe pushes wider and harder, displaced dots swell up and keep a
+  brief signal-coloured afterglow as they settle, and a click or tap sends
+  a ripple ring through the field. The animation loop only runs while
+  something is moving, and never while the canvas is off screen.
 */
 
 const props = defineProps<{ text: string }>()
@@ -34,6 +37,15 @@ interface Grid {
   dy: Float32Array
   vx: Float32Array
   vy: Float32Array
+  /** Lingering signal glow (0..1) a dot keeps after being pushed. */
+  glow: Float32Array
+}
+
+interface Ripple {
+  x: number
+  y: number
+  r: number
+  strength: number
 }
 
 let grid: Grid | null = null
@@ -52,7 +64,9 @@ let visibilityObserver: IntersectionObserver | null = null
 let colorDim = '#2b3036'
 let colorText = '#e9e7e2'
 let colorSignal = '#8aa2ff'
-const pointer = { x: -9999, y: -9999, active: false }
+/* x/y is the smoothed position the physics uses, tx/ty the raw target. */
+const pointer = { x: -9999, y: -9999, tx: -9999, ty: -9999, speed: 0, active: false }
+const ripples: Ripple[] = []
 
 function readColors(canvas: HTMLCanvasElement): void {
   const style = getComputedStyle(canvas)
@@ -124,6 +138,7 @@ function build(scatter: boolean): void {
     dy: new Float32Array(count),
     vx: new Float32Array(count),
     vy: new Float32Array(count),
+    glow: new Float32Array(count),
   }
 
   for (let row = 0; row < rows; row += 1) {
@@ -166,7 +181,8 @@ function draw(): void {
 
   for (let i = 0; i < g.count; i += 1) {
     const displaced = Math.abs(g.dx[i] ?? 0) + Math.abs(g.dy[i] ?? 0) > 1.2
-    g.kind[i] = displaced ? KIND_SIGNAL : g.inText[i] === 1 ? KIND_TEXT : KIND_DIM
+    // The afterglow keeps a dot signal-coloured a moment after it settles.
+    g.kind[i] = displaced || (g.glow[i] ?? 0) > 0.18 ? KIND_SIGNAL : g.inText[i] === 1 ? KIND_TEXT : KIND_DIM
   }
 
   const passes: ReadonlyArray<readonly [number, string]> = [
@@ -182,7 +198,11 @@ function draw(): void {
       if (g.kind[i] !== kind) continue
       const x = (g.baseX[i] ?? 0) + (g.dx[i] ?? 0)
       const y = (g.baseY[i] ?? 0) + (g.dy[i] ?? 0)
-      const r = g.inText[i] === 1 ? radiusText : kind === KIND_SIGNAL ? radiusDim * 1.8 : radiusDim
+      // Pushed dots swell with their displacement and shrink back on return.
+      const mag = Math.hypot(g.dx[i] ?? 0, g.dy[i] ?? 0)
+      const swell = 1 + Math.min(mag / (g.spacing * 2.2), 1) * (g.inText[i] === 1 ? 0.75 : 1.1)
+      const r =
+        (g.inText[i] === 1 ? radiusText : kind === KIND_SIGNAL ? radiusDim * 1.8 : radiusDim) * swell
       c.moveTo(x + r, y)
       c.arc(x, y, r, 0, TAU)
     }
@@ -197,10 +217,29 @@ function step(now: number): void {
 
   const dt = Math.min(2, (now - lastTime) / 16.667 || 1)
   lastTime = now
-  const radius = Math.max(90, Math.min(160, width * 0.12))
+
+  // Glide the smoothed pointer toward the raw target and track its speed,
+  // so a fast swipe sweeps a wider, harder push than a slow drift.
+  if (pointer.active) {
+    const prevX = pointer.x
+    const prevY = pointer.y
+    const glide = 1 - Math.pow(0.6, dt)
+    pointer.x += (pointer.tx - pointer.x) * glide
+    pointer.y += (pointer.ty - pointer.y) * glide
+    const rawSpeed = Math.hypot(pointer.x - prevX, pointer.y - prevY) / dt
+    pointer.speed += (rawSpeed - pointer.speed) * (1 - Math.pow(0.8, dt))
+  } else {
+    pointer.speed *= Math.pow(0.8, dt)
+  }
+  const speedBoost = Math.min(pointer.speed / 30, 1)
+
+  const radius = Math.max(90, Math.min(160, width * 0.12)) * (1 + speedBoost * 0.7)
   const radiusSq = radius * radius
+  const pushScale = 1 + speedBoost * 1.1
   const damping = Math.pow(DAMPING, dt)
-  let moving = false
+  const glowDecay = Math.pow(0.94, dt)
+  const maxDist = Math.hypot(width, height)
+  let moving = ripples.length > 0
   let displaced = false
 
   for (let i = 0; i < g.count; i += 1) {
@@ -216,7 +255,21 @@ function step(now: number): void {
       if (distSq < radiusSq && distSq > 0.01) {
         const dist = Math.sqrt(distSq)
         const strength = 1 - dist / radius
-        const push = strength * strength * 5 * dt
+        const push = strength * strength * 5 * pushScale * dt
+        vx += (ex / dist) * push
+        vy += (ey / dist) * push
+      }
+    }
+
+    // An expanding ripple ring shoves dots outward as it passes over them.
+    for (const ripple of ripples) {
+      const ex = (g.baseX[i] ?? 0) + dx - ripple.x
+      const ey = (g.baseY[i] ?? 0) + dy - ripple.y
+      const dist = Math.hypot(ex, ey)
+      const off = Math.abs(dist - ripple.r)
+      const band = 52
+      if (dist > 0.01 && off < band) {
+        const push = (1 - off / band) * ripple.strength * 3.4 * dt
         vx += (ex / dist) * push
         vy += (ey / dist) * push
       }
@@ -232,8 +285,23 @@ function step(now: number): void {
     g.vx[i] = vx
     g.vy[i] = vy
 
+    // Charge the afterglow from displacement, then let it fade out.
+    const mag = Math.hypot(dx, dy)
+    const charged = Math.min(mag / (g.spacing * 2), 1)
+    const faded = (g.glow[i] ?? 0) * glowDecay
+    g.glow[i] = charged > 0.25 ? Math.max(faded, charged) : faded
+    if ((g.glow[i] ?? 0) > 0.03) moving = true
+
     if (Math.abs(vx) + Math.abs(vy) > 0.02) moving = true
     if (Math.abs(dx) + Math.abs(dy) > 0.05) displaced = true
+  }
+
+  for (let i = ripples.length - 1; i >= 0; i -= 1) {
+    const ripple = ripples[i]
+    if (!ripple) continue
+    ripple.r += 9.5 * dt
+    ripple.strength *= Math.pow(0.985, dt)
+    if (ripple.r > maxDist || ripple.strength < 0.05) ripples.splice(i, 1)
   }
 
   if (!moving && !displaced) {
@@ -241,6 +309,7 @@ function step(now: number): void {
     g.dy.fill(0)
     g.vx.fill(0)
     g.vy.fill(0)
+    g.glow.fill(0)
   }
 
   draw()
@@ -257,9 +326,24 @@ function updatePointer(event: PointerEvent): void {
   const canvas = canvasEl.value
   if (!canvas || reduced.value || !visible) return
   const rect = canvas.getBoundingClientRect()
-  pointer.x = event.clientX - rect.left
-  pointer.y = event.clientY - rect.top
+  pointer.tx = event.clientX - rect.left
+  pointer.ty = event.clientY - rect.top
+  if (!pointer.active) {
+    // Snap on entry so the field does not sweep in from the last visit.
+    pointer.x = pointer.tx
+    pointer.y = pointer.ty
+    pointer.speed = 0
+  }
   pointer.active = true
+  kick()
+}
+
+function pressPointer(event: PointerEvent): void {
+  updatePointer(event)
+  if (reduced.value || !visible) return
+  // A click or tap rings the field like a struck surface.
+  ripples.push({ x: pointer.tx, y: pointer.ty, r: 0, strength: 1 })
+  if (ripples.length > 3) ripples.shift()
   kick()
 }
 
@@ -280,6 +364,7 @@ function scheduleRebuild(): void {
 watch(reduced, () => {
   if (!grid) return
   pointer.active = false
+  ripples.length = 0
   build(false)
 })
 
@@ -300,7 +385,7 @@ onMounted(async () => {
   build(!reduced.value)
 
   host.addEventListener('pointermove', updatePointer)
-  host.addEventListener('pointerdown', updatePointer)
+  host.addEventListener('pointerdown', pressPointer)
   host.addEventListener('pointerleave', releasePointer)
   host.addEventListener('pointercancel', releasePointer)
 
@@ -325,7 +410,7 @@ onBeforeUnmount(() => {
   resizeObserver?.disconnect()
   visibilityObserver?.disconnect()
   host?.removeEventListener('pointermove', updatePointer)
-  host?.removeEventListener('pointerdown', updatePointer)
+  host?.removeEventListener('pointerdown', pressPointer)
   host?.removeEventListener('pointerleave', releasePointer)
   host?.removeEventListener('pointercancel', releasePointer)
 })
