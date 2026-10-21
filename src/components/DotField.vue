@@ -96,19 +96,58 @@ function sampleText(): Uint8ClampedArray | null {
   const landscape = width > height
   // Narrow screens get a heavier weight so the letters keep enough dots per stem.
   const weight = landscape ? 700 : 850
+
+  // On narrow screens the whole word on one line comes out far too small:
+  // at phone width each letter would be only a few dots wide and the stems
+  // run into each other. Split it into two halves there ("hpmi" / "ne42"),
+  // which allows roughly double the letter size.
+  const twoLines = !landscape && width < 680 && props.text.length > 6
+  const splitAt = Math.ceil(props.text.length / 2)
+  const lines: readonly string[] = twoLines
+    ? [props.text.slice(0, splitAt), props.text.slice(splitAt)]
+    : [props.text]
+
   maskCtx.font = `${weight} 100px ${FONT_FAMILY}`
-  const measured = maskCtx.measureText(props.text).width
+  // A little tracking keeps neighbouring stems apart in the dot sampling.
+  try {
+    maskCtx.letterSpacing = '3px'
+  } catch {
+    /* Older engines simply render without tracking. */
+  }
+  const measured = Math.max(...lines.map((line) => maskCtx.measureText(line).width))
   if (measured <= 0) return null
 
-  const size = Math.min((100 * width * 0.9) / measured, height * 0.55)
+  const lineHeightFactor = 1.12
+  const heightFit =
+    lines.length === 1 ? height * 0.55 : (height * 0.52) / ((lines.length - 1) * lineHeightFactor + 0.72)
+  const size = Math.min((100 * width * 0.92) / measured, heightFit)
   maskCtx.font = `${weight} ${size}px ${FONT_FAMILY}`
-  maskCtx.textBaseline = 'alphabetic'
-  maskCtx.textAlign = 'left'
+  try {
+    maskCtx.letterSpacing = `${Math.round(size * 0.03)}px`
+  } catch {
+    /* See above. */
+  }
   maskCtx.fillStyle = '#fff'
-  const textWidth = (measured * size) / 100
-  const x = landscape ? width * 0.045 : (width - textWidth) / 2
-  const y = landscape ? height * 0.74 : height * 0.58
-  maskCtx.fillText(props.text, x, y)
+
+  if (lines.length === 1) {
+    maskCtx.textBaseline = 'alphabetic'
+    maskCtx.textAlign = 'left'
+    const textWidth = (measured * size) / 100
+    const x = landscape ? width * 0.045 : (width - textWidth) / 2
+    const y = landscape ? height * 0.74 : height * 0.58
+    maskCtx.fillText(lines[0] ?? props.text, x, y)
+  } else {
+    // Centred block, lines stacked with the middle of the block slightly
+    // above the middle of the screen (the hero footer sits below it).
+    maskCtx.textBaseline = 'middle'
+    maskCtx.textAlign = 'center'
+    const lineHeight = size * lineHeightFactor
+    const centreY = height * 0.52
+    lines.forEach((line, index) => {
+      const y = centreY + (index - (lines.length - 1) / 2) * lineHeight
+      maskCtx.fillText(line, width / 2, y)
+    })
+  }
 
   return maskCtx.getImageData(0, 0, width, height).data
 }
@@ -129,7 +168,9 @@ function build(scatter: boolean): void {
   if (!ctx) return
   readColors(canvas)
 
-  const spacing = Math.min(16, Math.max(7, Math.round(width / 96)))
+  // Fine enough that a letter stem is covered by several dots (on a phone
+  // this is 6px instead of 7px), coarse enough to stay cheap to draw.
+  const spacing = Math.min(15, Math.max(6, Math.round(width / 110)))
   const cols = Math.floor(width / spacing) + 1
   const rows = Math.floor(height / spacing) + 1
   const count = cols * rows
@@ -213,7 +254,9 @@ function draw(): void {
   c.clearRect(0, 0, width, height)
 
   const radiusDim = g.spacing * 0.085
-  const radiusText = g.spacing * (g.spacing < 10 ? 0.34 : 0.26)
+  // Deliberately well below half the spacing: if neighbouring text dots
+  // nearly touch, stems merge into blobs and the letters become unreadable.
+  const radiusText = g.spacing * (g.spacing < 10 ? 0.3 : 0.25)
 
   for (let i = 0; i < g.count; i += 1) {
     const displaced = Math.abs(g.dx[i] ?? 0) + Math.abs(g.dy[i] ?? 0) > 1.2
