@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { enough } from '../data/content'
 import { useReducedMotion } from '../composables/useReducedMotion'
 import { useScrollProgressVar } from '../composables/useScrollProgressVar'
+import EnoughBackdrop from './EnoughBackdrop.vue'
 import EnoughThread from './EnoughThread.vue'
 import ExternalLink from './ExternalLink.vue'
 import FactList from './FactList.vue'
@@ -20,6 +21,7 @@ useScrollProgressVar(
 
 <template>
   <section id="enough" class="enough" aria-labelledby="enough-title">
+    <EnoughBackdrop />
     <div class="enough__inner">
       <h2 id="enough-title" ref="word" class="enough__word">{{ enough.name }}</h2>
 
@@ -43,21 +45,27 @@ useScrollProgressVar(
 
 <style scoped>
 .enough {
-  --bg: var(--chalk);
-  --fg: var(--chalk-ink);
-  --fg-muted: var(--chalk-muted);
-  --rule: var(--chalk-line);
-  --rule-strong: #8b9399;
-  --focus: var(--chalk-focus);
-  --accent: var(--chalk-focus);
+  --bg: var(--graphite);
+  --fg: var(--paper);
+  --fg-muted: var(--paper-muted);
+  --rule: var(--graphite-line);
+  --rule-strong: var(--graphite-line-strong);
+  --focus: var(--signal);
+  --accent: var(--signal);
 
+  position: relative;
+  isolation: isolate;
   overflow-x: clip;
   padding: var(--section-y) var(--gutter);
-  background: var(--bg);
+  background:
+    radial-gradient(90% 60% at 50% 0%, #171a1f 0%, transparent 70%),
+    var(--bg);
   color: var(--fg);
 }
 
 .enough__inner {
+  position: relative;
+  z-index: 1;
   max-width: var(--content-max);
   margin-inline: auto;
 }
@@ -69,6 +77,8 @@ useScrollProgressVar(
   font-weight: calc(650 - 450 * var(--p));
   line-height: 0.85;
   letter-spacing: -0.055em;
+  /* The word sits on the digit field like type on a terminal. */
+  text-shadow: 0 0 clamp(2rem, 6vw, 5rem) rgba(18, 20, 22, 0.85);
 }
 
 .enough__grid {

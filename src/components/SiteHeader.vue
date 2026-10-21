@@ -35,16 +35,15 @@ defineProps<{ active: string }>()
 
 <style scoped>
 /*
-  White text with mix-blend-mode: difference inverts itself over the chalk
-  surface, so one header works on both dark and light sections.
+  Every surface is graphite now, so the header can simply sit on paper
+  colour instead of inverting itself with a blend mode.
 */
 .site-header {
   position: fixed;
   inset: 0 0 auto 0;
   z-index: 50;
   padding: 1rem var(--gutter);
-  color: #fff;
-  mix-blend-mode: difference;
+  color: var(--paper);
   pointer-events: none;
 }
 
@@ -94,6 +93,6 @@ defineProps<{ active: string }>()
 }
 
 .site-header__link:focus-visible {
-  outline-color: #fff;
+  outline-color: var(--signal);
 }
 </style>

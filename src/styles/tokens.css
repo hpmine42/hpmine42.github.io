@@ -1,7 +1,7 @@
 /*
   Design tokens.
-  Two surfaces carry the page: graphite (hero, Aiko, footer) and chalk (enough.).
-  One accent, "signal", is used sparingly.
+  One surface carries the page: graphite, with the enough. digit field as
+  its only texture. One accent, "signal", is used sparingly.
 */
 :root {
   /* Colour */
@@ -13,12 +13,6 @@
   --paper-muted: #9097a0;
   --signal: #8aa2ff;
   --dot-dim: #2b3036;
-
-  --chalk: #e4e7e9;
-  --chalk-ink: #14171a;
-  --chalk-muted: #4b535a;
-  --chalk-line: #bcc2c7;
-  --chalk-focus: #2f4bd8;
 
   /* Type */
   --font-sans: 'Geist Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;

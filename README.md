@@ -2,7 +2,7 @@
 
 Portfolio of hpmine42, built with Vue 3, TypeScript and Vite. Live at <https://hpmine42.github.io/>.
 
-The page has three parts: a dot-matrix hero, the project **enough.** and the project **Aiko**. Everything is in English and kept deliberately short.
+The page has two parts: a dot-matrix hero and the project **enough.**, which sits on an animated field of changing hexadecimal digits with a pointer light. Everything is in English and kept deliberately short.
 
 ## Stack
 
@@ -43,9 +43,9 @@ The site is served from the root of `https://hpmine42.github.io/`, so the Vite `
 2. In the repository open **Settings, Pages** and set **Source** to **GitHub Actions**.
 3. Push to `main`. `.github/workflows/deploy.yml` installs the dependencies, runs the type check and the build, and publishes `dist/`. You can also start it manually from the **Actions** tab (`workflow_dispatch`).
 
-### Important: do not create `enough/` or `Aiko/` folders here
+### Important: do not create an `enough/` folder here
 
-`https://hpmine42.github.io/enough/` and `https://hpmine42.github.io/Aiko/` are served by their own project repositories. Do not add folders with those names to this repository (not even under `public/`), otherwise they would collide with the project sites.
+`https://hpmine42.github.io/enough/` is served by its own project repository. Do not add a folder with that name to this repository (not even under `public/`), otherwise it would collide with the project site.
 
 ## Project structure
 
@@ -60,13 +60,12 @@ src/
   styles/base.css              Reset, focus styles, utilities
   composables/                 useReducedMotion, useActiveSection, useScrollProgressVar
   components/
-    SiteHeader.vue             Fixed navigation, inverts over the light section
+    SiteHeader.vue             Fixed navigation
     HeroSection.vue            Hero layout
     DotField.vue               Canvas dot-matrix name with pointer response
     ProjectEnough.vue          enough. section
+    EnoughBackdrop.vue         Changing hex digits and the pointer light behind enough.
     EnoughThread.vue           Message travelling between two people, then decrypting
-    ProjectAiko.vue            Aiko section
-    AikoResolver.vue           Replays how Aiko picks the stage that answers
     FactList.vue               Small label and value list
     ExternalLink.vue           External link with new-tab hint for screen readers
     SiteFooter.vue             Footer with the GitHub link
@@ -74,22 +73,22 @@ src/
 
 ## Editing the content
 
-All text, links and the Aiko demo data live in `src/data/content.ts`.
+All text, links and navigation items live in `src/data/content.ts`.
 
 - **enough.**: <https://hpmine42.github.io/enough/> (source: <https://github.com/hpmine42/enough>)
-- **Aiko**: <https://hpmine42.github.io/Aiko/> (source: <https://github.com/hpmine42/Aiko>)
 
-The Aiko description and the stage list in the resolver follow the README of the Aiko repository. If Aiko changes, update the `aiko` object and the `resolver*` data in that file.
+The description and the facts follow the README of the enough. repository. If enough. changes, update the `enough` object in that file.
 
 ## Motion and accessibility
 
-- With `prefers-reduced-motion: reduce` the dot field is drawn once without scatter or pointer response, the enough. message is shown decrypted, the Aiko resolver jumps straight to its result, and the title weight no longer follows scroll.
+- With `prefers-reduced-motion: reduce` the dot field is drawn once without scatter or pointer response, the enough. digit field is painted once and stops changing (the pointer light stays off), the enough. message is shown decrypted, and the title weight no longer follows scroll.
 - The dot-matrix canvas is decorative (`aria-hidden`); the page heading is a real, visually hidden `h1`.
 - All interactive elements are reachable by keyboard and have a visible focus ring.
 - External links announce that they open in a new tab.
 - The animation loop of the hero only runs while dots are moving and while the hero is on screen.
+- The enough. digit field repaints only when its characters actually change (about eight times a second) and only while the section is on screen; the pointer light is a separate, screen-blended layer that only moves by transform.
 
 ## Notes
 
-- The header uses `mix-blend-mode: difference`, so one set of links stays readable on the dark and on the light section.
-- The Aiko resolver uses the example inputs `/timer 5 Minuten`, `warum?` and `23 × 17` in the original German, because that is what the app expects.
+- Every surface is graphite now; the digit field is the only texture on the page and the header simply sits on paper colour.
+- The digit cells are drawn at a slightly lower resolution than the screen, which is invisible on a dim background but keeps the repaints cheap.
