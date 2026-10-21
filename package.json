@@ -2,7 +2,7 @@
   "name": "hpmine42-portfolio",
   "private": true,
   "version": "1.0.0",
-  "description": "Portfolio of Jakob (hpmine42), built with Vue 3, TypeScript and Vite.",
+  "description": "Portfolio of hpmine42, built with Vue 3, TypeScript and Vite.",
   "type": "module",
   "engines": {
     "node": "^20.19.0 || >=22.12.0"

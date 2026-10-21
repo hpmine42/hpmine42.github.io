@@ -12,7 +12,7 @@ export interface Project {
 }
 
 export const profile = {
-  name: 'Jakob',
+  name: 'hpmine42',
   role: 'Software developer',
   githubUrl: 'https://github.com/hpmine42',
   githubLabel: 'github.com/hpmine42',
@@ -52,7 +52,7 @@ export interface NavItem {
 }
 
 export const sections: readonly NavItem[] = [
-  { id: 'top', label: 'Jakob' },
+  { id: 'top', label: 'hpmine42' },
   { id: 'enough', label: 'enough.' },
   { id: 'aiko', label: 'Aiko' },
 ]
