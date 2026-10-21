@@ -12,6 +12,8 @@ import { useReducedMotion } from '../composables/useReducedMotion'
   that follows the pointer's path like a little animal — straight when
   you move straight, bending when you turn. It is deliberately a little
   plump: a broad body, a long tail, and dots that swell as it passes.
+  A tap or click leaves one clearly larger dot that blooms where the
+  pointer went down, then grows and fades again.
   Dots near the worm light up signal blue and budge just a little; per
   dot only the nearest segment counts, so the worm stays one clean body
   and never piles up where it crosses itself. Text dots only yield a
@@ -75,8 +77,11 @@ const pointer = { x: -9999, y: -9999, tx: -9999, ty: -9999, active: false }
 /** Pointer path, newest first. The worm's segments sit at fixed distances
     along this path, so the body keeps an even spacing whatever happens. */
 const wormPath: Array<{ x: number; y: number }> = []
-const WORM_SEGMENTS = 13
-const WORM_SPACING = 15
+const WORM_SEGMENTS = 14
+const WORM_SPACING = 16
+/** A dot that blooms where the pointer was pressed, then grows and fades. */
+const press = { x: 0, y: 0, at: Number.NEGATIVE_INFINITY, strength: 0 }
+const PRESS_MS = 620
 /** performance.now() timestamp of the intro assembly (0 = no intro running). */
 let introStart = 0
 
@@ -225,6 +230,8 @@ function build(scatter: boolean): void {
   }
 
   grid = next
+  press.at = Number.NEGATIVE_INFINITY
+  press.strength = 0
   introStart = scatter ? performance.now() : 0
   draw()
   if (scatter) kick()
@@ -277,6 +284,19 @@ function draw(): void {
     }
     c.fill()
   }
+
+  // The press dot: clearly larger than a normal dot. It sits at full
+  // strength under the finger/cursor at the moment of the tap, then
+  // expands and fades out instead of just vanishing.
+  if (press.strength > 0.002) {
+    const grow = 1 - press.strength
+    c.globalAlpha = Math.min(1, press.strength * 1.15) * 0.92
+    c.fillStyle = colorSignal
+    c.beginPath()
+    c.arc(press.x, press.y, radiusDim * (3.2 + 6.4 * grow), 0, TAU)
+    c.fill()
+    c.globalAlpha = 1
+  }
 }
 
 function step(now: number): void {
@@ -286,6 +306,9 @@ function step(now: number): void {
 
   const dt = Math.min(2, (now - lastTime) / 16.667 || 1)
   lastTime = now
+
+  const pressAge = now - press.at
+  press.strength = pressAge >= 0 && pressAge < PRESS_MS ? 1 - pressAge / PRESS_MS : 0
 
   // Follow the pointer closely, with just a little lag.
   if (pointer.active) {
@@ -378,7 +401,7 @@ function step(now: number): void {
       const dotY = (g.baseY[i] ?? 0) + dy
       for (let s = 0; s < wormCount; s += 1) {
         const fade = 1 - s / WORM_SEGMENTS
-        const segRadius = 11 + 16 * fade
+        const segRadius = 12 + 17 * fade
         const ex = dotX - (wormX[s] ?? 0)
         const ey = dotY - (wormY[s] ?? 0)
         const dist = Math.hypot(ex, ey)
@@ -395,6 +418,24 @@ function step(now: number): void {
         const push = best * best * 1.9 * give * dt
         vx += bestX * push
         vy += bestY * push
+      }
+    }
+
+    // The press dot also nudges the dots around it outward, so a tap
+    // reads as a small bloom rather than a single floating circle.
+    if (press.strength > 0) {
+      const dotX = (g.baseX[i] ?? 0) + dx
+      const dotY = (g.baseY[i] ?? 0) + dy
+      const ex = dotX - press.x
+      const ey = dotY - press.y
+      const dist = Math.hypot(ex, ey)
+      const flareRadius = g.spacing * 3.4
+      if (dist < flareRadius && dist > 0.01) {
+        const f = (1 - dist / flareRadius) * press.strength
+        const push = f * f * 2.4 * give * dt
+        vx += (ex / dist) * push
+        vy += (ey / dist) * push
+        if (f > 0.08) g.glow[i] = Math.max(g.glow[i] ?? 0, f)
       }
     }
 
@@ -438,6 +479,7 @@ function step(now: number): void {
   }
 
   if (introStart > 0 && !moving) introStart = 0
+  if (press.strength > 0) moving = true
 
   if (!moving && !displaced) {
     g.dx.fill(0)
@@ -471,6 +513,17 @@ function updatePointer(event: PointerEvent): void {
     wormPath.length = 0
   }
   pointer.active = true
+  kick()
+}
+
+function pressPointer(event: PointerEvent): void {
+  updatePointer(event)
+  if (!pointer.active) return
+  // The head sits exactly on the click point, so the bloom starts there.
+  press.x = pointer.x
+  press.y = pointer.y
+  press.at = performance.now()
+  press.strength = 1
   kick()
 }
 
@@ -512,7 +565,7 @@ onMounted(async () => {
   build(!reduced.value)
 
   host.addEventListener('pointermove', updatePointer)
-  host.addEventListener('pointerdown', updatePointer)
+  host.addEventListener('pointerdown', pressPointer)
   host.addEventListener('pointerleave', releasePointer)
   host.addEventListener('pointercancel', releasePointer)
 
@@ -537,7 +590,7 @@ onBeforeUnmount(() => {
   resizeObserver?.disconnect()
   visibilityObserver?.disconnect()
   host?.removeEventListener('pointermove', updatePointer)
-  host?.removeEventListener('pointerdown', updatePointer)
+  host?.removeEventListener('pointerdown', pressPointer)
   host?.removeEventListener('pointerleave', releasePointer)
   host?.removeEventListener('pointercancel', releasePointer)
 })
