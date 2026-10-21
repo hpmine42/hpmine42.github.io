@@ -74,8 +74,8 @@ const pointer = { x: -9999, y: -9999, tx: -9999, ty: -9999, active: false }
 /** Pointer path, newest first. The worm's segments sit at fixed distances
     along this path, so the body keeps an even spacing whatever happens. */
 const wormPath: Array<{ x: number; y: number }> = []
-const WORM_SEGMENTS = 11
-const WORM_SPACING = 14
+const WORM_SEGMENTS = 16
+const WORM_SPACING = 18
 /** performance.now() timestamp of the intro assembly (0 = no intro running). */
 let introStart = 0
 
@@ -268,7 +268,7 @@ function draw(): void {
       const swell =
         1 +
         Math.min(mag / (g.spacing * 2.2), 1) * (g.inText[i] === 1 ? 0.35 : 1.1) +
-        (kind === KIND_SIGNAL ? (g.glow[i] ?? 0) * 0.9 : 0)
+        (kind === KIND_SIGNAL ? (g.glow[i] ?? 0) * 1.25 : 0)
       const r =
         (g.inText[i] === 1 ? radiusText : kind === KIND_SIGNAL ? radiusDim * 1.8 : radiusDim) * swell
       c.moveTo(x + r, y)
@@ -377,7 +377,7 @@ function step(now: number): void {
       const dotY = (g.baseY[i] ?? 0) + dy
       for (let s = 0; s < wormCount; s += 1) {
         const fade = 1 - s / WORM_SEGMENTS
-        const segRadius = 9 + 13 * fade
+        const segRadius = 14 + 20 * fade
         const ex = dotX - (wormX[s] ?? 0)
         const ey = dotY - (wormY[s] ?? 0)
         const dist = Math.hypot(ex, ey)
@@ -391,7 +391,7 @@ function step(now: number): void {
       }
       wormGlow = best
       if (best > 0) {
-        const push = best * best * 1.7 * give * dt
+        const push = best * best * 2.2 * give * dt
         vx += bestX * push
         vy += bestY * push
       }
