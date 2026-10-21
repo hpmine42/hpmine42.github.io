@@ -8,11 +8,13 @@ import { useReducedMotion } from '../composables/useReducedMotion'
   in on straight horizontal lines from the left, released in a wave from
   left to right so the word assembles letter by letter, each dot flashing
   signal blue as it locks into place (about 2 seconds in total). The
-  pointer dents the field: background dots
-  give way freely, but text dots only yield a little against a stiffer
-  spring and a hard displacement cap, so the word stays readable while you
-  drag across it. Displaced dots swell slightly, keep a brief signal
-  afterglow, and a click or tap sends a ripple ring through the field. The
+  pointer dents the field along the straight segment it swept, so its wake
+  is a straight band of constant width that ends cleanly rather than an
+  eye-shaped trail tapering to a point: background dots give way freely,
+  but text dots only yield a little against a stiffer spring and a hard
+  displacement cap, so the word stays readable while you drag across it.
+  Displaced dots swell slightly, keep a brief signal afterglow, and a
+  click or tap sends a ripple ring through the field. The
   animation loop only runs while something is moving, and never while the
   canvas is off screen.
 */
@@ -73,8 +75,10 @@ let visibilityObserver: IntersectionObserver | null = null
 let colorDim = '#2b3036'
 let colorText = '#e9e7e2'
 let colorSignal = '#8aa2ff'
-/* x/y is the smoothed position the physics uses, tx/ty the raw target. */
-const pointer = { x: -9999, y: -9999, tx: -9999, ty: -9999, speed: 0, active: false }
+/* x/y is the smoothed position the physics uses, tx/ty the raw target,
+   px/py the smoothed position of the previous frame: together they form
+   the straight segment the pointer swept since the last frame. */
+const pointer = { x: -9999, y: -9999, tx: -9999, ty: -9999, px: -9999, py: -9999, active: false }
 const ripples: Ripple[] = []
 /** performance.now() timestamp of the intro assembly (0 = no intro running). */
 let introStart = 0
@@ -281,29 +285,31 @@ function step(now: number): void {
   const dt = Math.min(2, (now - lastTime) / 16.667 || 1)
   lastTime = now
 
-  // Glide the smoothed pointer toward the raw target and track its speed,
-  // so a fast swipe sweeps a wider, harder push than a slow drift.
+  // Glide the smoothed pointer toward the raw target. The segment from the
+  // previous smoothed position to the new one is this frame's swept path.
+  pointer.px = pointer.x
+  pointer.py = pointer.y
   if (pointer.active) {
-    const prevX = pointer.x
-    const prevY = pointer.y
     const glide = 1 - Math.pow(0.6, dt)
     pointer.x += (pointer.tx - pointer.x) * glide
     pointer.y += (pointer.ty - pointer.y) * glide
-    const rawSpeed = Math.hypot(pointer.x - prevX, pointer.y - prevY) / dt
-    pointer.speed += (rawSpeed - pointer.speed) * (1 - Math.pow(0.8, dt))
-  } else {
-    pointer.speed *= Math.pow(0.8, dt)
   }
-  const speedBoost = Math.min(pointer.speed / 30, 1)
+  const segX = pointer.x - pointer.px
+  const segY = pointer.y - pointer.py
+  const segLenSq = segX * segX + segY * segY
 
-  // A deliberately small, gentle dent: even a fast swipe only widens the
-  // field a little and never pushes much harder.
-  const radius = Math.max(80, Math.min(120, width * 0.1)) * (1 + speedBoost * 0.35)
-  const radiusSq = radius * radius
-  const pushScale = 1 + speedBoost * 0.4
+  // The pointer acts on the whole swept segment at once, not on one round
+  // point: the influence zone is a capsule of constant width around the
+  // segment (like a ruler laid along the path). The wake behind the pointer
+  // therefore has straight, parallel edges and a fixed width — the old
+  // round push made a lens/eye shape whose blue trail tapered to a weird
+  // point where the older, weaker pushes had decayed further.
+  const radius = Math.max(52, Math.min(72, width * 0.07))
   const damping = Math.pow(DAMPING, dt)
   const dampingText = Math.pow(DAMPING_TEXT, dt)
-  const glowDecay = Math.pow(0.94, dt)
+  // Fast fade: the blue afterglow ends cleanly instead of stretching into
+  // a long tapering tail behind the pointer.
+  const glowDecay = Math.pow(0.88, dt)
   const maxDist = Math.hypot(width, height)
   const introElapsed = introStart > 0 ? now - introStart : Number.POSITIVE_INFINITY
   // The intro is over after ~3.5s at the latest, even if the pointer keeps
@@ -335,13 +341,19 @@ function step(now: number): void {
     let vy = g.vy[i] ?? 0
 
     if (pointer.active) {
-      const ex = (g.baseX[i] ?? 0) + dx - pointer.x
-      const ey = (g.baseY[i] ?? 0) + dy - pointer.y
-      const distSq = ex * ex + ey * ey
-      if (distSq < radiusSq && distSq > 0.01) {
-        const dist = Math.sqrt(distSq)
-        const strength = 1 - dist / radius
-        const push = strength * strength * 3.1 * pushScale * give * dt
+      // Closest point on the swept segment: pushing away from it shoves
+      // dots perpendicular to the path, leaving a straight wake.
+      const relX = (g.baseX[i] ?? 0) + dx - pointer.px
+      const relY = (g.baseY[i] ?? 0) + dy - pointer.py
+      const along = segLenSq > 0.01 ? Math.min(1, Math.max(0, (relX * segX + relY * segY) / segLenSq)) : 0
+      const ex = relX - segX * along
+      const ey = relY - segY * along
+      const dist = Math.hypot(ex, ey)
+      if (dist < radius && dist > 0.01) {
+        // Flat core, short falloff at the edge: the wake has a uniform
+        // width along its whole length instead of pinching shut.
+        const strength = Math.min(1, (1 - dist / radius) * 2.4)
+        const push = strength * 2.7 * give * dt
         vx += (ex / dist) * push
         vy += (ey / dist) * push
       }
@@ -373,7 +385,7 @@ function step(now: number): void {
     // Hard cap on travel, tight for text dots (about 2 dot spacings): the
     // letters can lean away from the pointer but never tear apart. Not
     // applied during the intro, where dots legitimately start far away.
-    const cap = g.spacing * (isText ? 2.1 : 5)
+    const cap = g.spacing * (isText ? 2.1 : 3.6)
     const travel = Math.hypot(dx, dy)
     if (introStart === 0 && travel > cap) {
       dx = (dx / travel) * cap
@@ -436,7 +448,8 @@ function updatePointer(event: PointerEvent): void {
     // Snap on entry so the field does not sweep in from the last visit.
     pointer.x = pointer.tx
     pointer.y = pointer.ty
-    pointer.speed = 0
+    pointer.px = pointer.tx
+    pointer.py = pointer.ty
   }
   pointer.active = true
   kick()
