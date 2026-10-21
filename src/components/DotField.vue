@@ -4,10 +4,11 @@ import { useReducedMotion } from '../composables/useReducedMotion'
 
 /*
   A field of dots. The dots that fall inside the rendered text are larger and
-  brighter, so the word is drawn in dot-matrix. On load the text dots swirl
-  in on a spiral, released in a wave from left to right so the word assembles
-  letter by letter, each dot flashing signal blue as it locks into place
-  (about 2.5 seconds in total). The pointer dents the field: background dots
+  brighter, so the word is drawn in dot-matrix. On load the text dots slide
+  in on straight horizontal lines from the left, released in a wave from
+  left to right so the word assembles letter by letter, each dot flashing
+  signal blue as it locks into place (about 2 seconds in total). The
+  pointer dents the field: background dots
   give way freely, but text dots only yield a little against a stiffer
   spring and a hard displacement cap, so the word stays readable while you
   drag across it. Displaced dots swell slightly, keep a brief signal
@@ -193,11 +194,6 @@ function build(scatter: boolean): void {
     delay: new Float32Array(count).fill(-1),
   }
 
-  // Centre of the word, used as the hub of the intro spiral.
-  const hubX = width * 0.5
-  const hubY = height * (width > height ? 0.62 : 0.5)
-  const maxOffset = Math.max(width, height) * 0.42
-
   for (let row = 0; row < rows; row += 1) {
     for (let col = 0; col < cols; col += 1) {
       const i = row * cols + col
@@ -212,29 +208,17 @@ function build(scatter: boolean): void {
         if (value > 128) next.inText[i] = 1
       }
       if (scatter && next.inText[i] === 1) {
-        // Start on a spiral around the word: take the dot's vector from the
-        // hub, rotate it by roughly half a turn and push it outward, so the
-        // dot sweeps in on a curve instead of a straight line.
-        const vx0 = x - hubX
-        const vy0 = y - hubY
-        const turn = 2.5 + Math.random() * 0.7
-        const cos = Math.cos(turn)
-        const sin = Math.sin(turn)
-        const grow = 1.1 + Math.random() * 0.5
-        let ox = (vx0 * cos - vy0 * sin) * grow - vx0
-        let oy = (vx0 * sin + vy0 * cos) * grow - vy0
-        ox += (Math.random() - 0.5) * spacing * 3
-        oy += (Math.random() - 0.5) * spacing * 3
-        const mag = Math.hypot(ox, oy)
-        if (mag > maxOffset) {
-          ox = (ox / mag) * maxOffset
-          oy = (oy / mag) * maxOffset
-        }
-        next.dx[i] = ox
-        next.dy[i] = oy
+        // Straight in, no curves: every dot starts on its own row, just off
+        // the left edge of the screen, with no vertical offset at all. The
+        // spring then pulls it along a perfectly straight horizontal line
+        // onto its place — no swirl, no blob of waiting dots inside the
+        // field. A slight variation in distance keeps the front from
+        // looking like a rigid wall.
+        next.dx[i] = -(x + width * 0.12 + Math.random() * spacing * 2)
+        next.dy[i] = 0
         // Release in a wave across the word: left dots fly first, the last
-        // letter starts after ~1.1s and needs about another second to settle.
-        next.delay[i] = (x / width) * 1100 + Math.random() * 300
+        // letter starts after ~1s and needs about another second to settle.
+        next.delay[i] = (x / width) * 1000 + Math.random() * 150
       }
     }
   }
@@ -329,7 +313,7 @@ function step(now: number): void {
   let displaced = false
 
   for (let i = 0; i < g.count; i += 1) {
-    // Intro: hold each dot at its spiral start until its wave moment comes,
+    // Intro: hold each dot at its starting position until its wave moment,
     // then release it with a flash. Pointer and ripples cannot disturb a
     // dot that has not been released yet.
     const delay = g.delay[i] ?? -1
