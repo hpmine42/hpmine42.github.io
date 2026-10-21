@@ -10,12 +10,13 @@ import { useReducedMotion } from '../composables/useReducedMotion'
   signal blue as it locks into place (about 2 seconds in total). The
   pointer carries a small worm: a short chain of evenly spaced segments
   that follows the pointer's path like a little animal — straight when
-  you move straight, bending when you turn. Dots near the worm light up
-  signal blue and budge just a little; per dot only the nearest segment
-  counts, so the worm stays one clean body and never piles up where it
-  crosses itself. Text dots only yield a little against a stiffer
-  spring and a hard displacement cap, so the word stays readable while
-  you drag across it. The animation loop only runs while something is
+  you move straight, bending when you turn. It is deliberately a little
+  plump: a broad body, a long tail, and dots that swell as it passes.
+  Dots near the worm light up signal blue and budge just a little; per
+  dot only the nearest segment counts, so the worm stays one clean body
+  and never piles up where it crosses itself. Text dots only yield a
+  little against a stiffer spring and a hard displacement cap, so the
+  word stays readable while you drag across it. The animation loop only runs while something is
   moving, and never while the canvas is off screen.
 */
 
@@ -74,8 +75,8 @@ const pointer = { x: -9999, y: -9999, tx: -9999, ty: -9999, active: false }
 /** Pointer path, newest first. The worm's segments sit at fixed distances
     along this path, so the body keeps an even spacing whatever happens. */
 const wormPath: Array<{ x: number; y: number }> = []
-const WORM_SEGMENTS = 11
-const WORM_SPACING = 14
+const WORM_SEGMENTS = 13
+const WORM_SPACING = 15
 /** performance.now() timestamp of the intro assembly (0 = no intro running). */
 let introStart = 0
 
@@ -268,9 +269,9 @@ function draw(): void {
       const swell =
         1 +
         Math.min(mag / (g.spacing * 2.2), 1) * (g.inText[i] === 1 ? 0.35 : 1.1) +
-        (kind === KIND_SIGNAL ? (g.glow[i] ?? 0) * 0.9 : 0)
+        (kind === KIND_SIGNAL ? (g.glow[i] ?? 0) * 1.05 : 0)
       const r =
-        (g.inText[i] === 1 ? radiusText : kind === KIND_SIGNAL ? radiusDim * 1.8 : radiusDim) * swell
+        (g.inText[i] === 1 ? radiusText : kind === KIND_SIGNAL ? radiusDim * 1.95 : radiusDim) * swell
       c.moveTo(x + r, y)
       c.arc(x, y, r, 0, TAU)
     }
@@ -295,7 +296,7 @@ function step(now: number): void {
     const newest = wormPath[0]
     if (!newest || Math.hypot(pointer.x - newest.x, pointer.y - newest.y) > 3) {
       wormPath.unshift({ x: pointer.x, y: pointer.y })
-      if (wormPath.length > 80) wormPath.pop()
+      if (wormPath.length > 96) wormPath.pop()
     }
   } else {
     wormPath.length = 0
@@ -377,7 +378,7 @@ function step(now: number): void {
       const dotY = (g.baseY[i] ?? 0) + dy
       for (let s = 0; s < wormCount; s += 1) {
         const fade = 1 - s / WORM_SEGMENTS
-        const segRadius = 9 + 13 * fade
+        const segRadius = 11 + 16 * fade
         const ex = dotX - (wormX[s] ?? 0)
         const ey = dotY - (wormY[s] ?? 0)
         const dist = Math.hypot(ex, ey)
@@ -391,7 +392,7 @@ function step(now: number): void {
       }
       wormGlow = best
       if (best > 0) {
-        const push = best * best * 1.7 * give * dt
+        const push = best * best * 1.9 * give * dt
         vx += bestX * push
         vy += bestY * push
       }
