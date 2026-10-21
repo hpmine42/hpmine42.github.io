@@ -3,9 +3,16 @@ export interface Fact {
   readonly value: string
 }
 
+export interface Highlight {
+  readonly title: string
+  readonly text: string
+}
+
 export interface Project {
   readonly name: string
+  readonly kicker: string
   readonly summary: string
+  readonly highlights: readonly Highlight[]
   readonly liveUrl: string
   readonly repoUrl: string
   readonly facts: readonly Fact[]
@@ -20,7 +27,22 @@ export const profile = {
 
 export const enough: Project = {
   name: 'enough.',
+  kicker: 'Selected project',
   summary: 'A minimalist private 1:1 messenger focused on privacy, security and simplicity.',
+  highlights: [
+    {
+      title: 'Private by design',
+      text: 'Messages are end-to-end encrypted with the Signal Protocol, so nobody in between can read along.',
+    },
+    {
+      title: 'Simple on purpose',
+      text: 'One conversation, one screen. What is not there cannot distract you, and it cannot break either.',
+    },
+    {
+      title: 'Open to be checked',
+      text: 'React, TypeScript, Vite and Supabase, and the whole thing is open source. Read every line yourself.',
+    },
+  ],
   liveUrl: 'https://hpmine42.github.io/enough/',
   repoUrl: 'https://github.com/hpmine42/enough',
   facts: [
@@ -28,6 +50,16 @@ export const enough: Project = {
     { label: 'Built with', value: 'React, TypeScript, Vite, Supabase' },
   ],
 }
+
+/* The note under enough.: this page shows one selected project, the rest
+   of the work is on GitHub. */
+export const elsewhere = {
+  eyebrow: 'Beyond this page',
+  title: 'The rest of my work lives on GitHub',
+  text: 'enough. is the project I put the most into, so it is the only one shown here. Smaller tools, experiments and older ideas sit next to its source code.',
+  label: 'Browse all repositories',
+  url: 'https://github.com/hpmine42?tab=repositories',
+} as const
 
 export interface NavItem {
   readonly id: string

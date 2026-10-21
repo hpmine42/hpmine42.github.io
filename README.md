@@ -2,7 +2,7 @@
 
 Portfolio of hpmine42, built with Vue 3, TypeScript and Vite. Live at <https://hpmine42.github.io/>.
 
-The page has two parts: a dot-matrix hero and the project **enough.**, which sits on an animated field of changing hexadecimal digits with a pointer light. Everything is in English and kept deliberately short.
+The page has two parts: a dot-matrix hero and **enough.**, clearly marked as the selected project, sitting on an animated field of changing hexadecimal digits with a pointer light. Under it a short note points to GitHub for the rest of the work. Everything is in English and kept deliberately short.
 
 ## Stack
 
@@ -63,7 +63,7 @@ src/
     SiteHeader.vue             Fixed navigation
     HeroSection.vue            Hero layout
     DotField.vue               Canvas dot-matrix name with pointer response
-    ProjectEnough.vue          enough. section
+    ProjectEnough.vue          enough. section: selected-project label, highlights, demo panel, GitHub note
     EnoughBackdrop.vue         Changing hex digits and the pointer light behind enough.
     EnoughThread.vue           Message travelling between two people, then decrypting
     FactList.vue               Small label and value list
@@ -76,8 +76,9 @@ src/
 All text, links and navigation items live in `src/data/content.ts`.
 
 - **enough.**: <https://hpmine42.github.io/enough/> (source: <https://github.com/hpmine42/enough>)
+- **All repositories**: <https://github.com/hpmine42?tab=repositories>
 
-The description and the facts follow the README of the enough. repository. If enough. changes, update the `enough` object in that file.
+The `enough` object holds the kicker ("Selected project"), the summary, the three highlights and the facts; `elsewhere` holds the note that the rest of the work is on GitHub. The description and the facts follow the README of the enough. repository. If enough. changes, update those objects.
 
 ## Motion and accessibility
 
