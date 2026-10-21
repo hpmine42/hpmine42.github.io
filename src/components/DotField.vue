@@ -8,16 +8,15 @@ import { useReducedMotion } from '../composables/useReducedMotion'
   in on straight horizontal lines from the left, released in a wave from
   left to right so the word assembles letter by letter, each dot flashing
   signal blue as it locks into place (about 2 seconds in total). The
-  pointer is a big soft circle (the meteor's head) that follows with a
-  slight lag. Behind it, the last head positions form a tapering tail:
-  each older position pushes with a smaller radius and less force, like
-  a meteor streak. Per dot only the single strongest influence counts —
-  influences never add up — so where the tail crosses its own path it
-  stays a clean single streak instead of piling into a knot. Text dots
-  only yield a little against a stiffer spring and a hard displacement
-  cap, so the word stays readable while you drag across it. The
-  animation loop only runs while something is moving, and never while
-  the canvas is off screen.
+  pointer carries a small worm: a short chain of evenly spaced segments
+  that follows the pointer's path like a little animal — straight when
+  you move straight, bending when you turn. Dots near the worm light up
+  signal blue and budge just a little; per dot only the nearest segment
+  counts, so the worm stays one clean body and never piles up where it
+  crosses itself. Text dots only yield a little against a stiffer
+  spring and a hard displacement cap, so the word stays readable while
+  you drag across it. The animation loop only runs while something is
+  moving, and never while the canvas is off screen.
 */
 
 const props = defineProps<{ text: string }>()
@@ -72,8 +71,11 @@ let colorSignal = '#8aa2ff'
 /* x/y is the lagging circle position the physics uses, tx/ty the raw
    pointer target it eases toward. */
 const pointer = { x: -9999, y: -9999, tx: -9999, ty: -9999, active: false }
-/** Recent head positions, newest first: the meteor's tapering tail. */
-const meteor: Array<{ x: number; y: number }> = []
+/** Pointer path, newest first. The worm's segments sit at fixed distances
+    along this path, so the body keeps an even spacing whatever happens. */
+const wormPath: Array<{ x: number; y: number }> = []
+const WORM_SEGMENTS = 11
+const WORM_SPACING = 14
 /** performance.now() timestamp of the intro assembly (0 = no intro running). */
 let introStart = 0
 
@@ -259,9 +261,14 @@ function draw(): void {
       if (g.kind[i] !== kind) continue
       const x = (g.baseX[i] ?? 0) + (g.dx[i] ?? 0)
       const y = (g.baseY[i] ?? 0) + (g.dy[i] ?? 0)
-      // Pushed dots swell with their displacement and shrink back on return.
+      // Pushed dots swell with their displacement and shrink back on
+      // return; glowing dots (the worm's body) swell with their glow, so
+      // the worm reads as a plump little chain even where nothing moved.
       const mag = Math.hypot(g.dx[i] ?? 0, g.dy[i] ?? 0)
-      const swell = 1 + Math.min(mag / (g.spacing * 2.2), 1) * (g.inText[i] === 1 ? 0.35 : 1.1)
+      const swell =
+        1 +
+        Math.min(mag / (g.spacing * 2.2), 1) * (g.inText[i] === 1 ? 0.35 : 1.1) +
+        (kind === KIND_SIGNAL ? (g.glow[i] ?? 0) * 0.9 : 0)
       const r =
         (g.inText[i] === 1 ? radiusText : kind === KIND_SIGNAL ? radiusDim * 1.8 : radiusDim) * swell
       c.moveTo(x + r, y)
@@ -279,26 +286,53 @@ function step(now: number): void {
   const dt = Math.min(2, (now - lastTime) / 16.667 || 1)
   lastTime = now
 
-  // Ease the head circle toward the pointer with a slight lag.
+  // Follow the pointer closely, with just a little lag.
   if (pointer.active) {
-    const glide = 1 - Math.pow(0.68, dt)
+    const glide = 1 - Math.pow(0.35, dt)
     pointer.x += (pointer.tx - pointer.x) * glide
     pointer.y += (pointer.ty - pointer.y) * glide
 
-    // Remember the head's path as the meteor tail: a new sample whenever
-    // the head has moved a few pixels, capped so the tail keeps a fixed,
-    // short length instead of painting over the whole screen.
-    const newest = meteor[0]
-    if (!newest || Math.hypot(pointer.x - newest.x, pointer.y - newest.y) > 9) {
-      meteor.unshift({ x: pointer.x, y: pointer.y })
-      if (meteor.length > 14) meteor.pop()
+    const newest = wormPath[0]
+    if (!newest || Math.hypot(pointer.x - newest.x, pointer.y - newest.y) > 3) {
+      wormPath.unshift({ x: pointer.x, y: pointer.y })
+      if (wormPath.length > 80) wormPath.pop()
     }
   } else {
-    meteor.length = 0
+    wormPath.length = 0
   }
 
-  // The head is as large as it was in the very first version.
-  const radius = Math.max(90, Math.min(150, width * 0.12))
+  // Lay the worm's segments along the path at fixed arc-length distances:
+  // segment 0 is the head on the pointer, each next one WORM_SPACING px
+  // further back along the route the head actually travelled. Evenly
+  // spaced by construction — the body cannot bunch up or overlap itself.
+  const wormX = new Float32Array(WORM_SEGMENTS)
+  const wormY = new Float32Array(WORM_SEGMENTS)
+  let wormCount = 0
+  if (pointer.active && wormPath.length > 0) {
+    let seg = 1 // current path segment (wormPath[seg-1] -> wormPath[seg])
+    let walked = 0 // path length covered before that segment
+    for (let s = 0; s < WORM_SEGMENTS; s += 1) {
+      const target = s * WORM_SPACING
+      while (seg < wormPath.length) {
+        const a = wormPath[seg - 1]
+        const b = wormPath[seg]
+        if (!a || !b) break
+        const segLen = Math.hypot(b.x - a.x, b.y - a.y)
+        if (walked + segLen >= target) break
+        walked += segLen
+        seg += 1
+      }
+      const a = wormPath[Math.min(seg - 1, wormPath.length - 1)]
+      const b = wormPath[Math.min(seg, wormPath.length - 1)]
+      if (!a || !b) break
+      const segLen = Math.hypot(b.x - a.x, b.y - a.y)
+      const t = segLen > 0 ? Math.min(1, Math.max(0, (target - walked) / segLen)) : 0
+      wormX[s] = a.x + (b.x - a.x) * t
+      wormY[s] = a.y + (b.y - a.y) * t
+      wormCount = s + 1
+    }
+  }
+
   const damping = Math.pow(DAMPING, dt)
   const dampingText = Math.pow(DAMPING_TEXT, dt)
   const glowDecay = Math.pow(0.9, dt)
@@ -331,35 +365,33 @@ function step(now: number): void {
     let vx = g.vx[i] ?? 0
     let vy = g.vy[i] ?? 0
 
+    // The worm: find this dot's strongest segment. Segments shrink a
+    // little toward the tail. Only the best segment acts — never a sum —
+    // and the push is small: the worm is mostly light, not a bulldozer.
+    let wormGlow = 0
     if (pointer.active) {
-      // Meteor: the head (newest sample) pushes at full size, each older
-      // tail sample with a smaller radius and quadratically less force.
-      // Only the single strongest sample acts on the dot — never a sum —
-      // so a tail crossing itself cannot pile up into a knot.
       let best = 0
       let bestX = 0
       let bestY = 0
       const dotX = (g.baseX[i] ?? 0) + dx
       const dotY = (g.baseY[i] ?? 0) + dy
-      for (let j = 0; j < meteor.length; j += 1) {
-        const sample = meteor[j]
-        if (!sample) continue
-        const fade = 1 - j / Math.max(1, meteor.length)
-        const sampleRadius = radius * (0.3 + 0.7 * fade)
-        const ex = dotX - sample.x
-        const ey = dotY - sample.y
+      for (let s = 0; s < wormCount; s += 1) {
+        const fade = 1 - s / WORM_SEGMENTS
+        const segRadius = 9 + 13 * fade
+        const ex = dotX - (wormX[s] ?? 0)
+        const ey = dotY - (wormY[s] ?? 0)
         const dist = Math.hypot(ex, ey)
-        if (dist >= sampleRadius || dist <= 0.01) continue
-        const strength = (1 - dist / sampleRadius) * fade
-        const candidate = strength * strength
+        if (dist >= segRadius || dist <= 0.01) continue
+        const candidate = (1 - dist / segRadius) * (0.35 + 0.65 * fade)
         if (candidate > best) {
           best = candidate
           bestX = ex / dist
           bestY = ey / dist
         }
       }
+      wormGlow = best
       if (best > 0) {
-        const push = best * 4.4 * give * dt
+        const push = best * best * 1.7 * give * dt
         vx += bestX * push
         vy += bestY * push
       }
@@ -396,6 +428,8 @@ function step(now: number): void {
     const charged = Math.min(mag / (g.spacing * 2), 1)
     const faded = (g.glow[i] ?? 0) * glowDecay
     g.glow[i] = charged > 0.25 ? Math.max(faded, charged) : faded
+    // The worm's body is light: dots under a segment glow while it passes.
+    if (wormGlow > 0.08) g.glow[i] = Math.max(g.glow[i] ?? 0, wormGlow)
     if ((g.glow[i] ?? 0) > 0.03) moving = true
 
     if (Math.abs(vx) + Math.abs(vy) > 0.02) moving = true
@@ -433,7 +467,7 @@ function updatePointer(event: PointerEvent): void {
     // and start a fresh tail at the entry point.
     pointer.x = pointer.tx
     pointer.y = pointer.ty
-    meteor.length = 0
+    wormPath.length = 0
   }
   pointer.active = true
   kick()
@@ -456,7 +490,7 @@ function scheduleRebuild(): void {
 watch(reduced, () => {
   if (!grid) return
   pointer.active = false
-  meteor.length = 0
+  wormPath.length = 0
   build(false)
 })
 
