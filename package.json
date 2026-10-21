@@ -1,9 +1,9 @@
 {
-  "name": "hpmine42.github.io",
-  "version": "1.0.0",
+  "name": "hpmine42-portfolio",
   "private": true,
+  "version": "1.0.0",
+  "description": "Portfolio of Jakob (hpmine42), built with Vue 3, TypeScript and Vite.",
   "type": "module",
-  "description": "Portfolio of Jakob, hosted at https://hpmine42.github.io/",
   "engines": {
     "node": "^20.19.0 || >=22.12.0"
   },
@@ -14,17 +14,14 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@fontsource-variable/jetbrains-mono": "^5.0.0",
-    "@fontsource-variable/schibsted-grotesk": "^5.0.0",
-    "vue": "^3.5.13"
+    "@fontsource-variable/geist": "^5.3.0",
+    "@fontsource-variable/geist-mono": "^5.3.0",
+    "vue": "^3.5.44"
   },
   "devDependencies": {
-    "@tsconfig/node22": "^22.0.0",
-    "@types/node": "^22.15.0",
-    "@vitejs/plugin-vue": "^6.0.0",
-    "@vue/tsconfig": "^0.7.0",
-    "typescript": "~5.8.0",
-    "vite": "^7.0.0",
-    "vue-tsc": "^3.0.0"
+    "@vitejs/plugin-vue": "^6.0.10",
+    "typescript": "~5.9.3",
+    "vite": "^8.3.4",
+    "vue-tsc": "^3.3.13"
   }
 }

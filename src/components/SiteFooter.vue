@@ -1,82 +1,45 @@
 <script setup lang="ts">
-import { links } from '../data/projects'
+import { profile } from '../data/content'
+import ExternalLink from './ExternalLink.vue'
 
 const year = new Date().getFullYear()
 </script>
 
 <template>
-  <footer class="footer">
-    <div class="footer__inner">
-      <p class="footer__name">Jakob<span class="footer__caret" aria-hidden="true"></span></p>
-      <a class="footer__link" :href="links.github" target="_blank" rel="me noopener noreferrer">
-        github.com/hpmine42<span aria-hidden="true">&nbsp;↗</span>
-        <span class="visually-hidden"> (opens in a new tab)</span>
-      </a>
-      <a class="footer__link footer__top" href="#top">
-        top<span aria-hidden="true">&nbsp;↑</span>
-      </a>
-      <p class="footer__meta">© {{ year }}</p>
+  <footer class="site-footer">
+    <div class="site-footer__inner">
+      <p class="site-footer__name">{{ profile.name }}</p>
+      <ExternalLink :href="profile.githubUrl">{{ profile.githubLabel }}</ExternalLink>
+      <p class="site-footer__year">© {{ year }}</p>
     </div>
   </footer>
 </template>
 
 <style scoped>
-.footer {
-  padding: var(--s-5) var(--gutter) var(--s-4);
+.site-footer {
+  padding: 1.75rem var(--gutter) calc(1.75rem + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--rule);
+  background: var(--bg);
+  color: var(--fg);
+  font-size: var(--step--1);
 }
 
-.footer__inner {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
+.site-footer__inner {
+  display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
-  gap: var(--s-2) var(--s-5);
-  max-width: var(--max);
+  justify-content: space-between;
+  gap: 0.75rem 2rem;
+  max-width: var(--content-max);
   margin-inline: auto;
-  padding-top: var(--s-4);
-  border-top: 1px solid var(--scene-line);
-  font-family: var(--font-mono);
-  font-size: var(--text-ui);
 }
 
-.footer__name {
-  font-family: var(--font-sans);
-  font-size: var(--text-h3);
-  font-weight: 800;
-  letter-spacing: -0.04em;
+.site-footer__name {
+  font-weight: 650;
+  letter-spacing: -0.01em;
 }
 
-.footer__caret {
-  display: inline-block;
-  width: 0.09em;
-  height: 0.7em;
-  margin-left: 0.08em;
-  background: var(--signal);
-}
-
-.footer__link {
-  padding-block: 0.5rem;
-  color: var(--scene-muted);
-  transition: color var(--dur-fast) ease;
-}
-
-@media (hover: hover) {
-  .footer__link:hover {
-    color: var(--scene-fg);
-  }
-}
-
-.footer__meta {
-  grid-column: 1 / -1;
-  color: var(--scene-muted);
-}
-
-@media (max-width: 36rem) {
-  .footer__inner {
-    grid-template-columns: minmax(0, 1fr) auto;
-  }
-
-  .footer__name {
-    grid-column: 1 / -1;
-  }
+.site-footer__year {
+  color: var(--fg-muted);
 }
 </style>
