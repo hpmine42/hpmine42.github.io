@@ -9,7 +9,7 @@ import DotField from './DotField.vue'
     <h1 id="hero-title" class="sr-only">{{ profile.name }}</h1>
     <div class="hero__foot">
       <p class="hero__role">{{ profile.role }}</p>
-      <a class="hero__cue" href="#enough">Selected projects</a>
+      <a class="hero__cue" href="#enough">enough.</a>
     </div>
   </section>
 </template>
