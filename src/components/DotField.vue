@@ -10,16 +10,17 @@ import { useReducedMotion } from '../composables/useReducedMotion'
   signal blue as it locks into place (about 2 seconds in total). The
   pointer carries a small worm: a short chain of evenly spaced segments
   that follows the pointer's path like a little animal — straight when
-  you move straight, bending when you turn. It is deliberately a little
-  plump: a broad body, a long tail, and dots that swell as it passes.
-  A tap or click leaves one clearly larger dot that blooms where the
-  pointer went down, then grows and fades again.
-  Dots near the worm light up signal blue and budge just a little; per
-  dot only the nearest segment counts, so the worm stays one clean body
-  and never piles up where it crosses itself. Text dots only yield a
+  you move straight, bending when you turn. It is deliberately plump:
+  a solid bright head on the pointer, a broad body, a long tail, and
+  dots that swell as it passes. A tap or click leaves one clearly larger
+  dot that blooms where the pointer went down, then grows and fades
+  again. Dots near the worm light up signal blue and budge just a little;
+  per dot only the nearest segment counts, so the worm stays one clean
+  body and never piles up where it crosses itself. Text dots only yield a
   little against a stiffer spring and a hard displacement cap, so the
-  word stays readable while you drag across it. The animation loop only runs while something is
-  moving, and never while the canvas is off screen.
+  word stays readable while you drag across it. The animation loop only
+  runs while something is moving, and never while the canvas is off
+  screen.
 */
 
 const props = defineProps<{ text: string }>()
@@ -77,8 +78,8 @@ const pointer = { x: -9999, y: -9999, tx: -9999, ty: -9999, active: false }
 /** Pointer path, newest first. The worm's segments sit at fixed distances
     along this path, so the body keeps an even spacing whatever happens. */
 const wormPath: Array<{ x: number; y: number }> = []
-const WORM_SEGMENTS = 14
-const WORM_SPACING = 16
+const WORM_SEGMENTS = 18
+const WORM_SPACING = 18
 /** A dot that blooms where the pointer was pressed, then grows and fades. */
 const press = { x: 0, y: 0, at: Number.NEGATIVE_INFINITY, strength: 0 }
 const PRESS_MS = 620
@@ -276,13 +277,34 @@ function draw(): void {
       const swell =
         1 +
         Math.min(mag / (g.spacing * 2.2), 1) * (g.inText[i] === 1 ? 0.35 : 1.1) +
-        (kind === KIND_SIGNAL ? (g.glow[i] ?? 0) * 1.05 : 0)
+        (kind === KIND_SIGNAL ? (g.glow[i] ?? 0) * 1.45 : 0)
       const r =
-        (g.inText[i] === 1 ? radiusText : kind === KIND_SIGNAL ? radiusDim * 1.95 : radiusDim) * swell
+        (g.inText[i] === 1 ? radiusText : kind === KIND_SIGNAL ? radiusDim * 2.15 : radiusDim) * swell
       c.moveTo(x + r, y)
       c.arc(x, y, r, 0, TAU)
     }
     c.fill()
+  }
+
+  // The worm's head: a solid circle right on the pointer, a little larger
+  // than before, wrapped in two soft halos so it reads as a bright lamp
+  // dragging the tail behind it.
+  if (pointer.active && !reduced.value) {
+    const headR = g.spacing * 0.78
+    c.fillStyle = colorSignal
+    c.globalAlpha = 0.16
+    c.beginPath()
+    c.arc(pointer.x, pointer.y, headR * 2.2, 0, TAU)
+    c.fill()
+    c.globalAlpha = 0.3
+    c.beginPath()
+    c.arc(pointer.x, pointer.y, headR * 1.5, 0, TAU)
+    c.fill()
+    c.globalAlpha = 0.95
+    c.beginPath()
+    c.arc(pointer.x, pointer.y, headR, 0, TAU)
+    c.fill()
+    c.globalAlpha = 1
   }
 
   // The press dot: clearly larger than a normal dot. It sits at full
@@ -319,7 +341,7 @@ function step(now: number): void {
     const newest = wormPath[0]
     if (!newest || Math.hypot(pointer.x - newest.x, pointer.y - newest.y) > 3) {
       wormPath.unshift({ x: pointer.x, y: pointer.y })
-      if (wormPath.length > 96) wormPath.pop()
+      if (wormPath.length > 150) wormPath.pop()
     }
   } else {
     wormPath.length = 0
@@ -401,7 +423,7 @@ function step(now: number): void {
       const dotY = (g.baseY[i] ?? 0) + dy
       for (let s = 0; s < wormCount; s += 1) {
         const fade = 1 - s / WORM_SEGMENTS
-        const segRadius = 12 + 17 * fade
+        const segRadius = 15 + 24 * fade
         const ex = dotX - (wormX[s] ?? 0)
         const ey = dotY - (wormY[s] ?? 0)
         const dist = Math.hypot(ex, ey)
@@ -415,7 +437,7 @@ function step(now: number): void {
       }
       wormGlow = best
       if (best > 0) {
-        const push = best * best * 1.9 * give * dt
+        const push = best * best * 2.0 * give * dt
         vx += bestX * push
         vy += bestY * push
       }
