@@ -1,76 +1,53 @@
 /*
   Design tokens.
-  Palette: ink (graphite surfaces), bone (type on ink), paper (enough. scene),
-  signal (the single brand accent: caret, period, focus) and amber (Aiko only).
+  Two surfaces carry the page: graphite (hero, Aiko, footer) and chalk (enough.).
+  One accent, "signal", is used sparingly.
 */
 :root {
-  /* Surfaces and type */
-  --ink: #0f100d;
-  --ink-raised: #171814;
-  --ink-line: #2c2d28;
-  --bone: #ece9e1;
-  --bone-dim: #9a978d;
+  /* Colour */
+  --graphite: #121416;
+  --graphite-raised: #181b1e;
+  --graphite-line: #2a2f34;
+  --graphite-line-strong: #3b4147;
+  --paper: #e9e7e2;
+  --paper-muted: #9097a0;
+  --signal: #8aa2ff;
+  --dot-dim: #2b3036;
 
-  --paper: #ece9e1;
-  --paper-text: #11120f;
-  --paper-dim: #5b5950;
-  --paper-line: #c4c0b4;
-
-  /* Accents */
-  --signal: #ff5a2c;
-  --signal-deep: #b8360f;
-  --amber: #f0b23a;
-  --amber-dim: #a08142;
-  --amber-wash: rgb(240 178 58 / 0.07);
+  --chalk: #e4e7e9;
+  --chalk-ink: #14171a;
+  --chalk-muted: #4b535a;
+  --chalk-line: #bcc2c7;
+  --chalk-focus: #2f4bd8;
 
   /* Type */
-  --font-sans: 'Schibsted Grotesk Variable', 'Schibsted Grotesk', ui-sans-serif, system-ui,
-    -apple-system, 'Segoe UI', Roboto, sans-serif;
-  --font-mono: 'JetBrains Mono Variable', 'JetBrains Mono', ui-monospace, 'SFMono-Regular',
-    Menlo, Consolas, monospace;
+  --font-sans: 'Geist Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'Geist Mono Variable', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
 
-  --text-ui: 0.875rem;
-  --text-body: 1rem;
-  --text-lede: clamp(1.125rem, 1rem + 0.55vw, 1.4rem);
-  --text-h3: clamp(1.4rem, 1.1rem + 1.2vw, 2.1rem);
-  --text-title: clamp(4rem, 1rem + 13vw, 13rem);
-  --text-display: clamp(5rem, 1rem + 20vw, 19rem);
+  --step--1: clamp(0.8125rem, 0.79rem + 0.1vw, 0.875rem);
+  --step-0: clamp(1rem, 0.97rem + 0.15vw, 1.0625rem);
+  --step-1: clamp(1.25rem, 1.08rem + 0.8vw, 1.75rem);
 
   /* Space */
-  --s-1: 0.5rem;
-  --s-2: 0.75rem;
-  --s-3: 1rem;
-  --s-4: 1.5rem;
-  --s-5: 2.5rem;
-  --s-6: 4rem;
-  --s-7: clamp(5rem, 3rem + 8vw, 10rem);
-  --gutter: clamp(1.25rem, 0.75rem + 3vw, 3.5rem);
-  --max: 92rem;
-  --nav-h: 3.5rem;
+  --gutter: clamp(1.25rem, 4vw, 3rem);
+  --section-y: clamp(5rem, 12vw, 10rem);
+  --content-max: 90rem;
+
+  /* Shape */
+  --radius: 2px;
 
   /* Motion */
-  --ease-out: cubic-bezier(0.16, 0.84, 0.24, 1);
-  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
-  --dur-fast: 180ms;
-  --dur-mid: 420ms;
-  --dur-scene: 700ms;
+  --ease-out: cubic-bezier(0.2, 0.7, 0.1, 1);
+  --ease-in-out: cubic-bezier(0.6, 0, 0.2, 1);
 
-  /* Scene variables: switched by the active section (see App.vue) */
-  --scene-bg: var(--ink);
-  --scene-fg: var(--bone);
-  --scene-muted: var(--bone-dim);
-  --scene-line: var(--ink-line);
-  --scene-accent: var(--signal);
-}
+  /* Section-scoped colours, overridden per surface */
+  --bg: var(--graphite);
+  --fg: var(--paper);
+  --fg-muted: var(--paper-muted);
+  --rule: var(--graphite-line);
+  --rule-strong: var(--graphite-line-strong);
+  --focus: var(--signal);
+  --accent: var(--signal);
 
-:root[data-scene='enough'] {
-  --scene-bg: var(--paper);
-  --scene-fg: var(--paper-text);
-  --scene-muted: var(--paper-dim);
-  --scene-line: var(--paper-line);
-  --scene-accent: var(--signal-deep);
-}
-
-:root[data-scene='aiko'] {
-  --scene-accent: var(--amber);
+  color-scheme: dark;
 }

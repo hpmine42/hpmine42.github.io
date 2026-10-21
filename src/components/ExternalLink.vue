@@ -2,89 +2,56 @@
 withDefaults(
   defineProps<{
     href: string
-    primary?: boolean
+    variant?: 'button' | 'text'
   }>(),
-  { primary: false },
+  { variant: 'text' },
 )
 </script>
 
 <template>
-  <a
-    class="xlink"
-    :class="{ 'xlink--primary': primary }"
-    :href="href"
-    target="_blank"
-    rel="noopener noreferrer"
-  >
-    <span class="xlink__label"><slot /></span>
-    <span class="xlink__arrow" aria-hidden="true">↗</span>
-    <span class="visually-hidden"> (opens in a new tab)</span>
+  <a :class="['ext', `ext--${variant}`]" :href="href" target="_blank" rel="noopener noreferrer">
+    <slot />
+    <span class="sr-only"> (opens in a new tab)</span>
   </a>
 </template>
 
 <style scoped>
-.xlink {
+.ext {
+  color: inherit;
+  text-decoration: none;
+}
+
+.ext--text {
+  background-image: linear-gradient(currentColor, currentColor);
+  background-repeat: no-repeat;
+  background-position: 0 100%;
+  background-size: 100% 1px;
+  padding-bottom: 0.15em;
+  transition: background-size 0.35s var(--ease-out);
+}
+
+.ext--text:hover,
+.ext--text:focus-visible {
+  background-size: 0 1px;
+  background-position: 100% 100%;
+}
+
+.ext--button {
   display: inline-flex;
-  align-items: baseline;
-  gap: 0.35em;
-  padding-block: 0.25em;
-  font-family: var(--font-mono);
-  font-size: var(--text-ui);
-  color: var(--scene-fg);
-  transition: color var(--dur-fast) ease;
+  align-items: center;
+  min-height: 2.75rem;
+  padding: 0.55rem 1.25rem;
+  border: 1px solid currentColor;
+  border-radius: var(--radius);
+  font-weight: 500;
+  transition:
+    background-color 0.25s var(--ease-out),
+    color 0.25s var(--ease-out);
 }
 
-.xlink__label {
-  position: relative;
-}
-
-.xlink__label::after {
-  content: '';
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: -0.2em;
-  height: 1px;
-  background: currentColor;
-  transform-origin: left;
-  transform: scaleX(0.35);
-  transition: transform var(--dur-mid) var(--ease-out);
-}
-
-.xlink__arrow {
-  display: inline-block;
-  transition: transform var(--dur-mid) var(--ease-out);
-}
-
-.xlink--primary {
-  font-family: var(--font-sans);
-  font-size: var(--text-h3);
-  font-weight: 700;
-  letter-spacing: -0.02em;
-}
-
-.xlink--primary .xlink__label::after {
-  height: 2px;
-  bottom: -0.12em;
-  background: var(--scene-accent);
-  transform: scaleX(1);
-}
-
-@media (hover: hover) {
-  .xlink:hover .xlink__label::after {
-    transform: scaleX(1);
-  }
-
-  .xlink:hover .xlink__arrow {
-    transform: translate(0.15em, -0.15em);
-  }
-
-  .xlink--primary:hover {
-    color: var(--scene-accent);
-  }
-}
-
-.xlink:focus-visible .xlink__label::after {
-  transform: scaleX(1);
+.ext--button:hover,
+.ext--button:focus-visible {
+  background: var(--fg);
+  color: var(--bg);
 }
 </style>

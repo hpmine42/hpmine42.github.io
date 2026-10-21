@@ -1,36 +1,41 @@
 <script setup lang="ts">
-import { useTemplateRef } from 'vue'
-import CipherWire from './CipherWire.vue'
+import { computed, ref } from 'vue'
+import { enough } from '../data/content'
+import { useReducedMotion } from '../composables/useReducedMotion'
+import { useScrollProgressVar } from '../composables/useScrollProgressVar'
+import EnoughThread from './EnoughThread.vue'
 import ExternalLink from './ExternalLink.vue'
 import FactList from './FactList.vue'
-import { enough } from '../data/projects'
-import { useInView } from '../composables/useInView'
 
-const root = useTemplateRef<HTMLElement>('root')
-const inView = useInView(() => root.value)
+const reduced = useReducedMotion()
+const word = ref<HTMLElement | null>(null)
+
+// The title gets lighter as it scrolls into place: less, but enough.
+useScrollProgressVar(
+  word,
+  '--p',
+  computed(() => !reduced.value),
+)
 </script>
 
 <template>
-  <section id="enough" ref="root" class="enough" :class="{ 'is-in': inView }" aria-labelledby="enough-title">
+  <section id="enough" class="enough" aria-labelledby="enough-title">
     <div class="enough__inner">
-      <p class="enough__label label">project / messenger</p>
+      <h2 id="enough-title" ref="word" class="enough__word">{{ enough.name }}</h2>
 
-      <h2 id="enough-title" class="enough__title">
-        enough<span class="enough__dot">.</span>
-      </h2>
+      <div class="enough__grid">
+        <div class="enough__intro">
+          <p class="enough__lede">{{ enough.summary }}</p>
+          <div class="enough__actions">
+            <ExternalLink :href="enough.liveUrl" variant="button">Open enough.</ExternalLink>
+            <ExternalLink :href="enough.repoUrl">Source on GitHub</ExternalLink>
+          </div>
+        </div>
 
-      <p class="enough__lede">
-        A private 1:1 messenger.<br />
-        Defined by what it leaves out.
-      </p>
-
-      <CipherWire class="enough__wire" message="see you at eight" />
-
-      <FactList class="enough__facts" :facts="enough.facts" variant="rows" />
-
-      <div class="enough__links">
-        <ExternalLink :href="enough.live" primary>Open enough.</ExternalLink>
-        <ExternalLink :href="enough.source">Source on GitHub</ExternalLink>
+        <div class="enough__visual">
+          <EnoughThread />
+          <FactList :facts="enough.facts" />
+        </div>
       </div>
     </div>
   </section>
@@ -38,98 +43,70 @@ const inView = useInView(() => root.value)
 
 <style scoped>
 .enough {
-  padding: var(--s-7) var(--gutter);
+  --bg: var(--chalk);
+  --fg: var(--chalk-ink);
+  --fg-muted: var(--chalk-muted);
+  --rule: var(--chalk-line);
+  --rule-strong: #8b9399;
+  --focus: var(--chalk-focus);
+  --accent: var(--chalk-focus);
+
+  overflow-x: clip;
+  padding: var(--section-y) var(--gutter);
+  background: var(--bg);
+  color: var(--fg);
 }
 
 .enough__inner {
-  display: grid;
-  grid-template-columns: repeat(12, minmax(0, 1fr));
-  column-gap: var(--s-4);
-  max-width: var(--max);
+  max-width: var(--content-max);
   margin-inline: auto;
 }
 
-.enough__label {
-  grid-column: 1 / -1;
-  margin-bottom: var(--s-3);
+.enough__word {
+  --p: 1;
+  margin: 0 0 clamp(3rem, 8vw, 7rem) -0.04em;
+  font-size: clamp(4rem, 23vw, 19rem);
+  font-weight: calc(650 - 450 * var(--p));
+  line-height: 0.85;
+  letter-spacing: -0.055em;
 }
 
-.enough__title {
-  grid-column: 1 / span 8;
-  font-size: var(--text-title);
-  font-weight: 800;
-  line-height: 0.82;
-  letter-spacing: -0.065em;
-  margin-left: -0.05em;
-  opacity: 0;
-  transform: translateY(0.14em);
-  transition:
-    opacity 900ms var(--ease-out),
-    transform 1100ms var(--ease-out);
+.enough__grid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  column-gap: clamp(1rem, 3vw, 2.5rem);
+  row-gap: clamp(3rem, 8vw, 5rem);
 }
 
-.enough__dot {
-  color: var(--signal);
-  display: inline-block;
-  transform: scale(0.4);
-  transform-origin: 50% 85%;
-  transition: transform 700ms var(--ease-out) 550ms;
+.enough__intro {
+  grid-column: 1 / span 5;
+}
+
+.enough__visual {
+  grid-column: 7 / span 6;
+  display: grid;
+  gap: clamp(2rem, 4vw, 3rem);
 }
 
 .enough__lede {
-  grid-column: 9 / -1;
-  align-self: end;
-  font-size: var(--text-lede);
-  font-weight: 500;
+  max-width: 22em;
+  font-size: var(--step-1);
   line-height: 1.3;
-  opacity: 0;
-  transition: opacity 900ms var(--ease-out) 300ms;
+  letter-spacing: -0.015em;
 }
 
-.is-in .enough__title,
-.is-in .enough__lede {
-  opacity: 1;
-  transform: none;
-}
-
-.is-in .enough__dot {
-  transform: none;
-}
-
-.enough__wire {
-  grid-column: 1 / -1;
-  margin-top: var(--s-6);
-}
-
-.enough__facts {
-  grid-column: 1 / span 7;
-  margin-top: var(--s-4);
-}
-
-.enough__links {
-  grid-column: 9 / -1;
-  align-self: end;
+.enough__actions {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: var(--s-3);
-  margin-top: var(--s-4);
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem 1.75rem;
+  margin-top: 2.25rem;
 }
 
-@media (max-width: 60rem) {
-  .enough__title,
-  .enough__lede,
-  .enough__facts,
-  .enough__links {
+@media (max-width: 52rem) {
+  .enough__intro,
+  .enough__visual {
     grid-column: 1 / -1;
-  }
-
-  .enough__lede {
-    margin-top: var(--s-4);
-  }
-
-  .enough__links {
-    margin-top: var(--s-5);
   }
 }
 </style>

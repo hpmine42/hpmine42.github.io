@@ -1,23 +1,18 @@
 <script setup lang="ts">
-import { watchEffect } from 'vue'
-import SiteNav from './components/SiteNav.vue'
+import { sections } from './data/content'
+import { useActiveSection } from './composables/useActiveSection'
 import HeroSection from './components/HeroSection.vue'
-import ProjectEnough from './components/ProjectEnough.vue'
 import ProjectAiko from './components/ProjectAiko.vue'
+import ProjectEnough from './components/ProjectEnough.vue'
 import SiteFooter from './components/SiteFooter.vue'
-import { useActiveScene } from './composables/useActiveScene'
+import SiteHeader from './components/SiteHeader.vue'
 
-const activeScene = useActiveScene()
-
-// The page changes its surface as each project takes the centre of the viewport.
-watchEffect(() => {
-  document.documentElement.dataset.scene = activeScene.value
-})
+const active = useActiveSection(sections.map((section) => section.id))
 </script>
 
 <template>
   <a class="skip-link" href="#enough">Skip to projects</a>
-  <SiteNav :active="activeScene" />
+  <SiteHeader :active="active" />
   <main>
     <HeroSection />
     <ProjectEnough />
