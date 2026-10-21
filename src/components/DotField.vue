@@ -8,14 +8,16 @@ import { useReducedMotion } from '../composables/useReducedMotion'
   in on straight horizontal lines from the left, released in a wave from
   left to right so the word assembles letter by letter, each dot flashing
   signal blue as it locks into place (about 2 seconds in total). The
-  pointer is simply a soft round circle of influence that follows the
-  real pointer with a slight lag, as if pulled behind it: dots inside
-  the circle give way radially — background dots freely, text dots only
-  a little against a stiffer spring and a hard displacement cap, so the
-  word stays readable while you drag across it. Displaced dots swell
-  slightly and keep a brief signal afterglow. The animation loop only
-  runs while something is moving, and never while the canvas is off
-  screen.
+  pointer is a big soft circle (the meteor's head) that follows with a
+  slight lag. Behind it, the last head positions form a tapering tail:
+  each older position pushes with a smaller radius and less force, like
+  a meteor streak. Per dot only the single strongest influence counts —
+  influences never add up — so where the tail crosses its own path it
+  stays a clean single streak instead of piling into a knot. Text dots
+  only yield a little against a stiffer spring and a hard displacement
+  cap, so the word stays readable while you drag across it. The
+  animation loop only runs while something is moving, and never while
+  the canvas is off screen.
 */
 
 const props = defineProps<{ text: string }>()
@@ -70,6 +72,8 @@ let colorSignal = '#8aa2ff'
 /* x/y is the lagging circle position the physics uses, tx/ty the raw
    pointer target it eases toward. */
 const pointer = { x: -9999, y: -9999, tx: -9999, ty: -9999, active: false }
+/** Recent head positions, newest first: the meteor's tapering tail. */
+const meteor: Array<{ x: number; y: number }> = []
 /** performance.now() timestamp of the intro assembly (0 = no intro running). */
 let introStart = 0
 
@@ -275,22 +279,29 @@ function step(now: number): void {
   const dt = Math.min(2, (now - lastTime) / 16.667 || 1)
   lastTime = now
 
-  // Ease the influence circle toward the pointer: it covers only about a
-  // fifth of the remaining distance per frame, so the circle visibly
-  // trails a little behind the finger/mouse and swings smoothly along.
+  // Ease the head circle toward the pointer with a slight lag.
   if (pointer.active) {
-    const glide = 1 - Math.pow(0.78, dt)
+    const glide = 1 - Math.pow(0.68, dt)
     pointer.x += (pointer.tx - pointer.x) * glide
     pointer.y += (pointer.ty - pointer.y) * glide
+
+    // Remember the head's path as the meteor tail: a new sample whenever
+    // the head has moved a few pixels, capped so the tail keeps a fixed,
+    // short length instead of painting over the whole screen.
+    const newest = meteor[0]
+    if (!newest || Math.hypot(pointer.x - newest.x, pointer.y - newest.y) > 9) {
+      meteor.unshift({ x: pointer.x, y: pointer.y })
+      if (meteor.length > 14) meteor.pop()
+    }
+  } else {
+    meteor.length = 0
   }
 
-  const radius = Math.max(56, Math.min(76, width * 0.075))
-  const radiusSq = radius * radius
+  // The head is as large as it was in the very first version.
+  const radius = Math.max(90, Math.min(150, width * 0.12))
   const damping = Math.pow(DAMPING, dt)
   const dampingText = Math.pow(DAMPING_TEXT, dt)
-  // Fast fade, so the blue stays with the moving circle instead of
-  // stretching into a tail behind it.
-  const glowDecay = Math.pow(0.86, dt)
+  const glowDecay = Math.pow(0.9, dt)
   const introElapsed = introStart > 0 ? now - introStart : Number.POSITIVE_INFINITY
   // The intro is over after ~3.5s at the latest, even if the pointer keeps
   // the field busy: from then on the readability caps apply.
@@ -321,16 +332,36 @@ function step(now: number): void {
     let vy = g.vy[i] ?? 0
 
     if (pointer.active) {
-      // Plain radial push around the lagging circle.
-      const ex = (g.baseX[i] ?? 0) + dx - pointer.x
-      const ey = (g.baseY[i] ?? 0) + dy - pointer.y
-      const distSq = ex * ex + ey * ey
-      if (distSq < radiusSq && distSq > 0.01) {
-        const dist = Math.sqrt(distSq)
-        const strength = 1 - dist / radius
-        const push = strength * strength * 2.9 * give * dt
-        vx += (ex / dist) * push
-        vy += (ey / dist) * push
+      // Meteor: the head (newest sample) pushes at full size, each older
+      // tail sample with a smaller radius and quadratically less force.
+      // Only the single strongest sample acts on the dot — never a sum —
+      // so a tail crossing itself cannot pile up into a knot.
+      let best = 0
+      let bestX = 0
+      let bestY = 0
+      const dotX = (g.baseX[i] ?? 0) + dx
+      const dotY = (g.baseY[i] ?? 0) + dy
+      for (let j = 0; j < meteor.length; j += 1) {
+        const sample = meteor[j]
+        if (!sample) continue
+        const fade = 1 - j / Math.max(1, meteor.length)
+        const sampleRadius = radius * (0.3 + 0.7 * fade)
+        const ex = dotX - sample.x
+        const ey = dotY - sample.y
+        const dist = Math.hypot(ex, ey)
+        if (dist >= sampleRadius || dist <= 0.01) continue
+        const strength = (1 - dist / sampleRadius) * fade
+        const candidate = strength * strength
+        if (candidate > best) {
+          best = candidate
+          bestX = ex / dist
+          bestY = ey / dist
+        }
+      }
+      if (best > 0) {
+        const push = best * 4.4 * give * dt
+        vx += bestX * push
+        vy += bestY * push
       }
     }
 
@@ -398,9 +429,11 @@ function updatePointer(event: PointerEvent): void {
   pointer.tx = event.clientX - rect.left
   pointer.ty = event.clientY - rect.top
   if (!pointer.active) {
-    // Snap on entry so the field does not sweep in from the last visit.
+    // Snap on entry so the field does not sweep in from the last visit,
+    // and start a fresh tail at the entry point.
     pointer.x = pointer.tx
     pointer.y = pointer.ty
+    meteor.length = 0
   }
   pointer.active = true
   kick()
@@ -423,6 +456,7 @@ function scheduleRebuild(): void {
 watch(reduced, () => {
   if (!grid) return
   pointer.active = false
+  meteor.length = 0
   build(false)
 })
 
