@@ -4,12 +4,16 @@ import { useReducedMotion } from '../composables/useReducedMotion'
 
 /*
   A field of dots. The dots that fall inside the rendered text are larger and
-  brighter, so the word is drawn in dot-matrix. The pointer pushes dots away
-  and springs bring them back. The pointer is smoothed and speed-aware: a
-  fast swipe pushes wider and harder, displaced dots swell up and keep a
-  brief signal-coloured afterglow as they settle, and a click or tap sends
-  a ripple ring through the field. The animation loop only runs while
-  something is moving, and never while the canvas is off screen.
+  brighter, so the word is drawn in dot-matrix. On load the text dots swirl
+  in on a spiral, released in a wave from left to right so the word assembles
+  letter by letter, each dot flashing signal blue as it locks into place
+  (about 2.5 seconds in total). The pointer dents the field: background dots
+  give way freely, but text dots only yield a little against a stiffer
+  spring and a hard displacement cap, so the word stays readable while you
+  drag across it. Displaced dots swell slightly, keep a brief signal
+  afterglow, and a click or tap sends a ripple ring through the field. The
+  animation loop only runs while something is moving, and never while the
+  canvas is off screen.
 */
 
 const props = defineProps<{ text: string }>()
@@ -18,7 +22,9 @@ const canvasEl = ref<HTMLCanvasElement | null>(null)
 const reduced = useReducedMotion()
 
 const SPRING = 0.085
-const DAMPING = 0.82
+const SPRING_TEXT = 0.16
+const DAMPING = 0.84
+const DAMPING_TEXT = 0.78
 const TAU = Math.PI * 2
 const FONT_FAMILY = '"Geist Variable", system-ui, sans-serif'
 
@@ -39,6 +45,8 @@ interface Grid {
   vy: Float32Array
   /** Lingering signal glow (0..1) a dot keeps after being pushed. */
   glow: Float32Array
+  /** Intro: ms after intro start when this dot is released (-1 = released). */
+  delay: Float32Array
 }
 
 interface Ripple {
@@ -67,6 +75,8 @@ let colorSignal = '#8aa2ff'
 /* x/y is the smoothed position the physics uses, tx/ty the raw target. */
 const pointer = { x: -9999, y: -9999, tx: -9999, ty: -9999, speed: 0, active: false }
 const ripples: Ripple[] = []
+/** performance.now() timestamp of the intro assembly (0 = no intro running). */
+let introStart = 0
 
 function readColors(canvas: HTMLCanvasElement): void {
   const style = getComputedStyle(canvas)
@@ -86,19 +96,58 @@ function sampleText(): Uint8ClampedArray | null {
   const landscape = width > height
   // Narrow screens get a heavier weight so the letters keep enough dots per stem.
   const weight = landscape ? 700 : 850
+
+  // On narrow screens the whole word on one line comes out far too small:
+  // at phone width each letter would be only a few dots wide and the stems
+  // run into each other. Split it into two halves there ("hpmi" / "ne42"),
+  // which allows roughly double the letter size.
+  const twoLines = !landscape && width < 680 && props.text.length > 6
+  const splitAt = Math.ceil(props.text.length / 2)
+  const lines: readonly string[] = twoLines
+    ? [props.text.slice(0, splitAt), props.text.slice(splitAt)]
+    : [props.text]
+
   maskCtx.font = `${weight} 100px ${FONT_FAMILY}`
-  const measured = maskCtx.measureText(props.text).width
+  // A little tracking keeps neighbouring stems apart in the dot sampling.
+  try {
+    maskCtx.letterSpacing = '3px'
+  } catch {
+    /* Older engines simply render without tracking. */
+  }
+  const measured = Math.max(...lines.map((line) => maskCtx.measureText(line).width))
   if (measured <= 0) return null
 
-  const size = Math.min((100 * width * 0.9) / measured, height * 0.55)
+  const lineHeightFactor = 1.12
+  const heightFit =
+    lines.length === 1 ? height * 0.55 : (height * 0.52) / ((lines.length - 1) * lineHeightFactor + 0.72)
+  const size = Math.min((100 * width * 0.92) / measured, heightFit)
   maskCtx.font = `${weight} ${size}px ${FONT_FAMILY}`
-  maskCtx.textBaseline = 'alphabetic'
-  maskCtx.textAlign = 'left'
+  try {
+    maskCtx.letterSpacing = `${Math.round(size * 0.03)}px`
+  } catch {
+    /* See above. */
+  }
   maskCtx.fillStyle = '#fff'
-  const textWidth = (measured * size) / 100
-  const x = landscape ? width * 0.045 : (width - textWidth) / 2
-  const y = landscape ? height * 0.74 : height * 0.58
-  maskCtx.fillText(props.text, x, y)
+
+  if (lines.length === 1) {
+    maskCtx.textBaseline = 'alphabetic'
+    maskCtx.textAlign = 'left'
+    const textWidth = (measured * size) / 100
+    const x = landscape ? width * 0.045 : (width - textWidth) / 2
+    const y = landscape ? height * 0.74 : height * 0.58
+    maskCtx.fillText(lines[0] ?? props.text, x, y)
+  } else {
+    // Centred block, lines stacked with the middle of the block slightly
+    // above the middle of the screen (the hero footer sits below it).
+    maskCtx.textBaseline = 'middle'
+    maskCtx.textAlign = 'center'
+    const lineHeight = size * lineHeightFactor
+    const centreY = height * 0.52
+    lines.forEach((line, index) => {
+      const y = centreY + (index - (lines.length - 1) / 2) * lineHeight
+      maskCtx.fillText(line, width / 2, y)
+    })
+  }
 
   return maskCtx.getImageData(0, 0, width, height).data
 }
@@ -119,7 +168,9 @@ function build(scatter: boolean): void {
   if (!ctx) return
   readColors(canvas)
 
-  const spacing = Math.min(16, Math.max(7, Math.round(width / 96)))
+  // Fine enough that a letter stem is covered by several dots (on a phone
+  // this is 6px instead of 7px), coarse enough to stay cheap to draw.
+  const spacing = Math.min(15, Math.max(6, Math.round(width / 110)))
   const cols = Math.floor(width / spacing) + 1
   const rows = Math.floor(height / spacing) + 1
   const count = cols * rows
@@ -139,7 +190,13 @@ function build(scatter: boolean): void {
     vx: new Float32Array(count),
     vy: new Float32Array(count),
     glow: new Float32Array(count),
+    delay: new Float32Array(count).fill(-1),
   }
+
+  // Centre of the word, used as the hub of the intro spiral.
+  const hubX = width * 0.5
+  const hubY = height * (width > height ? 0.62 : 0.5)
+  const maxOffset = Math.max(width, height) * 0.42
 
   for (let row = 0; row < rows; row += 1) {
     for (let col = 0; col < cols; col += 1) {
@@ -155,15 +212,35 @@ function build(scatter: boolean): void {
         if (value > 128) next.inText[i] = 1
       }
       if (scatter && next.inText[i] === 1) {
-        const angle = Math.random() * TAU
-        const distance = spacing * (6 + Math.random() * 22)
-        next.dx[i] = Math.cos(angle) * distance
-        next.dy[i] = Math.sin(angle) * distance
+        // Start on a spiral around the word: take the dot's vector from the
+        // hub, rotate it by roughly half a turn and push it outward, so the
+        // dot sweeps in on a curve instead of a straight line.
+        const vx0 = x - hubX
+        const vy0 = y - hubY
+        const turn = 2.5 + Math.random() * 0.7
+        const cos = Math.cos(turn)
+        const sin = Math.sin(turn)
+        const grow = 1.1 + Math.random() * 0.5
+        let ox = (vx0 * cos - vy0 * sin) * grow - vx0
+        let oy = (vx0 * sin + vy0 * cos) * grow - vy0
+        ox += (Math.random() - 0.5) * spacing * 3
+        oy += (Math.random() - 0.5) * spacing * 3
+        const mag = Math.hypot(ox, oy)
+        if (mag > maxOffset) {
+          ox = (ox / mag) * maxOffset
+          oy = (oy / mag) * maxOffset
+        }
+        next.dx[i] = ox
+        next.dy[i] = oy
+        // Release in a wave across the word: left dots fly first, the last
+        // letter starts after ~1.1s and needs about another second to settle.
+        next.delay[i] = (x / width) * 1100 + Math.random() * 300
       }
     }
   }
 
   grid = next
+  introStart = scatter ? performance.now() : 0
   draw()
   if (scatter) kick()
 }
@@ -177,7 +254,9 @@ function draw(): void {
   c.clearRect(0, 0, width, height)
 
   const radiusDim = g.spacing * 0.085
-  const radiusText = g.spacing * (g.spacing < 10 ? 0.34 : 0.26)
+  // Deliberately well below half the spacing: if neighbouring text dots
+  // nearly touch, stems merge into blobs and the letters become unreadable.
+  const radiusText = g.spacing * (g.spacing < 10 ? 0.3 : 0.25)
 
   for (let i = 0; i < g.count; i += 1) {
     const displaced = Math.abs(g.dx[i] ?? 0) + Math.abs(g.dy[i] ?? 0) > 1.2
@@ -200,7 +279,7 @@ function draw(): void {
       const y = (g.baseY[i] ?? 0) + (g.dy[i] ?? 0)
       // Pushed dots swell with their displacement and shrink back on return.
       const mag = Math.hypot(g.dx[i] ?? 0, g.dy[i] ?? 0)
-      const swell = 1 + Math.min(mag / (g.spacing * 2.2), 1) * (g.inText[i] === 1 ? 0.75 : 1.1)
+      const swell = 1 + Math.min(mag / (g.spacing * 2.2), 1) * (g.inText[i] === 1 ? 0.35 : 1.1)
       const r =
         (g.inText[i] === 1 ? radiusText : kind === KIND_SIGNAL ? radiusDim * 1.8 : radiusDim) * swell
       c.moveTo(x + r, y)
@@ -233,16 +312,39 @@ function step(now: number): void {
   }
   const speedBoost = Math.min(pointer.speed / 30, 1)
 
-  const radius = Math.max(90, Math.min(160, width * 0.12)) * (1 + speedBoost * 0.7)
+  // A deliberately small, gentle dent: even a fast swipe only widens the
+  // field a little and never pushes much harder.
+  const radius = Math.max(80, Math.min(120, width * 0.1)) * (1 + speedBoost * 0.35)
   const radiusSq = radius * radius
-  const pushScale = 1 + speedBoost * 1.1
+  const pushScale = 1 + speedBoost * 0.4
   const damping = Math.pow(DAMPING, dt)
+  const dampingText = Math.pow(DAMPING_TEXT, dt)
   const glowDecay = Math.pow(0.94, dt)
   const maxDist = Math.hypot(width, height)
+  const introElapsed = introStart > 0 ? now - introStart : Number.POSITIVE_INFINITY
+  // The intro is over after ~3.5s at the latest, even if the pointer keeps
+  // the field busy: from then on the readability caps apply.
+  if (introElapsed > 3500) introStart = 0
   let moving = ripples.length > 0
   let displaced = false
 
   for (let i = 0; i < g.count; i += 1) {
+    // Intro: hold each dot at its spiral start until its wave moment comes,
+    // then release it with a flash. Pointer and ripples cannot disturb a
+    // dot that has not been released yet.
+    const delay = g.delay[i] ?? -1
+    if (delay >= 0) {
+      if (introElapsed < delay) {
+        moving = true
+        continue
+      }
+      g.delay[i] = -1
+      g.glow[i] = 1
+    }
+
+    const isText = g.inText[i] === 1
+    // The word resists: text dots feel only about half the push.
+    const give = isText ? 0.45 : 1
     let dx = g.dx[i] ?? 0
     let dy = g.dy[i] ?? 0
     let vx = g.vx[i] ?? 0
@@ -255,7 +357,7 @@ function step(now: number): void {
       if (distSq < radiusSq && distSq > 0.01) {
         const dist = Math.sqrt(distSq)
         const strength = 1 - dist / radius
-        const push = strength * strength * 5 * pushScale * dt
+        const push = strength * strength * 3.1 * pushScale * give * dt
         vx += (ex / dist) * push
         vy += (ey / dist) * push
       }
@@ -269,16 +371,32 @@ function step(now: number): void {
       const off = Math.abs(dist - ripple.r)
       const band = 52
       if (dist > 0.01 && off < band) {
-        const push = (1 - off / band) * ripple.strength * 3.4 * dt
+        const push = (1 - off / band) * ripple.strength * 2.6 * give * dt
         vx += (ex / dist) * push
         vy += (ey / dist) * push
       }
     }
 
-    vx = (vx - dx * SPRING * dt) * damping
-    vy = (vy - dy * SPRING * dt) * damping
+    // Text dots sit on a stiffer, more damped spring: they dent and are
+    // back in place quickly, without the wobbly overshoot of the field.
+    const spring = isText ? SPRING_TEXT : SPRING
+    const damp = isText ? dampingText : damping
+    vx = (vx - dx * spring * dt) * damp
+    vy = (vy - dy * spring * dt) * damp
     dx += vx * dt
     dy += vy * dt
+
+    // Hard cap on travel, tight for text dots (about 2 dot spacings): the
+    // letters can lean away from the pointer but never tear apart. Not
+    // applied during the intro, where dots legitimately start far away.
+    const cap = g.spacing * (isText ? 2.1 : 5)
+    const travel = Math.hypot(dx, dy)
+    if (introStart === 0 && travel > cap) {
+      dx = (dx / travel) * cap
+      dy = (dy / travel) * cap
+      vx *= 0.6
+      vy *= 0.6
+    }
 
     g.dx[i] = dx
     g.dy[i] = dy
@@ -295,6 +413,8 @@ function step(now: number): void {
     if (Math.abs(vx) + Math.abs(vy) > 0.02) moving = true
     if (Math.abs(dx) + Math.abs(dy) > 0.05) displaced = true
   }
+
+  if (introStart > 0 && !moving) introStart = 0
 
   for (let i = ripples.length - 1; i >= 0; i -= 1) {
     const ripple = ripples[i]
