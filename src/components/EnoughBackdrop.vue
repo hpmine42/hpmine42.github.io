@@ -305,11 +305,7 @@ onBeforeUnmount(() => {
 <template>
   <div class="backdrop" aria-hidden="true">
     <canvas ref="canvasEl" class="backdrop__digits" />
-    <div
-      ref="lightEl"
-      class="backdrop__light"
-      :style="{ '--light-radius': `${LIGHT_RADIUS}px` }"
-    />
+    <div ref="lightEl" class="backdrop__light" :style="{ '--light-radius': `${LIGHT_RADIUS}px` }" />
     <div class="backdrop__scan" />
     <div class="backdrop__vignette" />
   </div>
@@ -397,6 +393,12 @@ onBeforeUnmount(() => {
   z-index: 2;
   background:
     radial-gradient(120% 80% at 50% 0%, transparent 45%, rgba(9, 10, 12, 0.55) 100%),
-    linear-gradient(to bottom, rgba(18, 20, 22, 0.9), transparent 14%, transparent 86%, rgba(18, 20, 22, 0.9));
+    linear-gradient(
+      to bottom,
+      rgba(18, 20, 22, 0.9),
+      transparent 14%,
+      transparent 86%,
+      rgba(18, 20, 22, 0.9)
+    );
 }
 </style>

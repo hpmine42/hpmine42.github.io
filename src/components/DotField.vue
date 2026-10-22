@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useReducedMotion } from '../composables/useReducedMotion'
+import { splitName } from '../utils/name-layout'
+import { advanceTrailLife } from '../utils/trail'
 
 /*
   A field of dots. The dots that fall inside the rendered text are larger and
@@ -89,15 +91,20 @@ const pointer = { x: -9999, y: -9999, tx: -9999, ty: -9999, active: false }
 const wormPath: Array<{ x: number; y: number }> = []
 const WORM_SEGMENTS = 18
 const WORM_SPACING = 8
-/** A resting pointer keeps its tail this long, then the tail retracts. */
-const WORM_HOLD_MS = 120
-const WORM_RETRACT_MS = 520
-/** Moving again grows the tail back at this pace instead of popping it in. */
-const WORM_GROW_MS = 260
 /** Body geometry of the last step, shared with draw() so it can be painted. */
 const wormX = new Float32Array(WORM_SEGMENTS)
 const wormY = new Float32Array(WORM_SEGMENTS)
 let wormCount = 0
+/* Per-segment reach and fade for this frame: the field dots and the letters of
+   the name feel the tail at different radii, so both are prepared once
+   instead of being recomputed for every dot. */
+const reachField = new Float32Array(WORM_SEGMENTS)
+const reachText = new Float32Array(WORM_SEGMENTS)
+const fadeOf = new Float32Array(WORM_SEGMENTS)
+/** A tap counts as a tap if the pointer wanders less than this. */
+const PRESS_TOLERANCE = 12
+let pressStartX = 0
+let pressStartY = 0
 /** A dot that blooms where the pointer was pressed, then grows and fades. */
 const press = { x: 0, y: 0, at: Number.NEGATIVE_INFINITY, strength: 0 }
 const PRESS_MS = 620
@@ -121,19 +128,8 @@ function sampleText(): Uint8ClampedArray | null {
   const maskCtx = mask.getContext('2d', { willReadFrequently: true })
   if (!maskCtx) return null
 
-  const landscape = width > height
-  // Narrow screens get a heavier weight so the letters keep enough dots per stem.
-  const weight = landscape ? 700 : 850
-
-  // On narrow screens the whole word on one line comes out far too small:
-  // at phone width each letter would be only a few dots wide and the stems
-  // run into each other. Split it into two halves there ("hpmi" / "ne42"),
-  // which allows roughly double the letter size.
-  const twoLines = !landscape && width < 680 && props.text.length > 6
-  const splitAt = Math.ceil(props.text.length / 2)
-  const lines: readonly string[] = twoLines
-    ? [props.text.slice(0, splitAt), props.text.slice(splitAt)]
-    : [props.text]
+  // Weight and line split live in a small pure helper, so they can be tested.
+  const { landscape, weight, lines } = splitName(props.text, width, height)
 
   maskCtx.font = `${weight} 100px ${FONT_FAMILY}`
   // A little tracking keeps neighbouring stems apart in the dot sampling.
@@ -147,7 +143,9 @@ function sampleText(): Uint8ClampedArray | null {
 
   const lineHeightFactor = 1.12
   const heightFit =
-    lines.length === 1 ? height * 0.55 : (height * 0.52) / ((lines.length - 1) * lineHeightFactor + 0.72)
+    lines.length === 1
+      ? height * 0.55
+      : (height * 0.52) / ((lines.length - 1) * lineHeightFactor + 0.72)
   const size = Math.min((100 * width * 0.92) / measured, heightFit)
   maskCtx.font = `${weight} ${size}px ${FONT_FAMILY}`
   try {
@@ -274,7 +272,8 @@ function draw(): void {
   for (let i = 0; i < g.count; i += 1) {
     const displaced = Math.abs(g.dx[i] ?? 0) + Math.abs(g.dy[i] ?? 0) > 1.2
     // The afterglow keeps a dot signal-coloured a moment after it settles.
-    g.kind[i] = displaced || (g.glow[i] ?? 0) > 0.18 ? KIND_SIGNAL : g.inText[i] === 1 ? KIND_TEXT : KIND_DIM
+    g.kind[i] =
+      displaced || (g.glow[i] ?? 0) > 0.18 ? KIND_SIGNAL : g.inText[i] === 1 ? KIND_TEXT : KIND_DIM
   }
 
   const passes: ReadonlyArray<readonly [number, string]> = [
@@ -299,7 +298,8 @@ function draw(): void {
         Math.min(mag / (g.spacing * 2.2), 1) * (g.inText[i] === 1 ? 0.95 : 1.1) +
         (kind === KIND_SIGNAL ? (g.glow[i] ?? 0) * (g.inText[i] === 1 ? 0.85 : 1.35) : 0)
       const r =
-        (g.inText[i] === 1 ? radiusText : kind === KIND_SIGNAL ? radiusDim * 2.6 : radiusDim) * swell
+        (g.inText[i] === 1 ? radiusText : kind === KIND_SIGNAL ? radiusDim * 2.6 : radiusDim) *
+        swell
       c.moveTo(x + r, y)
       c.arc(x, y, r, 0, TAU)
     }
@@ -345,20 +345,13 @@ function step(now: number): void {
   const pressAge = now - press.at
   press.strength = pressAge >= 0 && pressAge < PRESS_MS ? 1 - pressAge / PRESS_MS : 0
 
-  // How much worm is left. It is never set straight from one end to the
-  // other: while the pointer moves it grows back (WORM_GROW_MS), and when
-  // the pointer rests it retracts (WORM_RETRACT_MS). That way the tail
-  // unrolls out of the head instead of popping in from nothing.
-  const idleFor = now - lastMoveAt
-  const stepDown = dt * (16.667 / WORM_RETRACT_MS)
-  const stepUp = dt * (16.667 / WORM_GROW_MS)
-  if (!pointer.active) {
-    wormLife = Math.max(0, wormLife - stepDown)
-  } else if (idleFor <= WORM_HOLD_MS) {
-    wormLife = Math.min(1, wormLife + stepUp)
-  } else {
-    wormLife = Math.max(0, wormLife - stepDown)
-  }
+  // How much worm is left: growing while the pointer moves, retracting while
+  // it rests. The easing itself lives in src/utils/trail.ts.
+  wormLife = advanceTrailLife(wormLife, {
+    active: pointer.active,
+    idleFor: now - lastMoveAt,
+    dt,
+  })
   // Once the tail is gone, forget the old route: a new one starts where the
   // pointer moves next, instead of unrolling the path from before.
   if (wormLife === 0) wormPath.length = 0
@@ -424,6 +417,18 @@ function step(now: number): void {
     wormY[s] = (py + 2 * (wormY[s] ?? 0) + ny) / 4
   }
 
+  // Reach and fade per segment, prepared once for this frame. The letters of
+  // the name feel the tail from a little further away, so they get their own
+  // table — and the per-dot loop below can then reject a segment with two
+  // subtractions instead of a square root.
+  for (let s = 0; s < wormCount; s += 1) {
+    const fade = 1 - s / WORM_SEGMENTS
+    const reach = 14 + 20 * fade
+    reachField[s] = reach
+    reachText[s] = reach * 1.18
+    fadeOf[s] = 0.35 + 0.65 * fade
+  }
+
   const damping = Math.pow(DAMPING, dt)
   const dampingText = Math.pow(DAMPING_TEXT, dt)
   const glowDecay = Math.pow(0.9, dt)
@@ -464,16 +469,19 @@ function step(now: number): void {
       let bestY = 0
       const dotX = (g.baseX[i] ?? 0) + dx
       const dotY = (g.baseY[i] ?? 0) + dy
+      const reach = isText ? reachText : reachField
       for (let s = 0; s < wormCount; s += 1) {
-        const fade = 1 - s / WORM_SEGMENTS
-        // The letters feel the tail from a little further away, so the whole
-        // word starts to move before the tail actually reaches it.
-        const segRadius = (14 + 20 * fade) * (isText ? 1.18 : 1)
+        // Same test as before (distance < segment reach), just without the
+        // square root for the segments that cannot reach this dot anyway.
+        const segRadius = reach[s] ?? 0
         const ex = dotX - (wormX[s] ?? 0)
+        if (ex >= segRadius || ex <= -segRadius) continue
         const ey = dotY - (wormY[s] ?? 0)
-        const dist = Math.hypot(ex, ey)
-        if (dist >= segRadius || dist <= 0.01) continue
-        const candidate = (1 - dist / segRadius) * (0.35 + 0.65 * fade)
+        if (ey >= segRadius || ey <= -segRadius) continue
+        const distSq = ex * ex + ey * ey
+        if (distSq >= segRadius * segRadius || distSq <= 1e-4) continue
+        const dist = Math.sqrt(distSq)
+        const candidate = (1 - dist / segRadius) * (fadeOf[s] ?? 0)
         if (candidate > best) {
           best = candidate
           bestX = ex / dist
@@ -642,14 +650,26 @@ function updatePointer(event: PointerEvent): void {
 }
 
 function pressPointer(event: PointerEvent): void {
+  // Remember where the pointer went down. The bloom is only started when it
+  // comes back up in (roughly) the same place, so a swipe or a scroll never
+  // leaves a click dot behind.
   updatePointer(event)
-  if (!pointer.active) return
-  // The head sits exactly on the click point, so the bloom starts there.
-  press.x = pointer.x
-  press.y = pointer.y
-  press.at = performance.now()
-  press.strength = 1
-  kick()
+  pressStartX = event.clientX
+  pressStartY = event.clientY
+}
+
+function endPress(event: PointerEvent): void {
+  const moved = Math.hypot(event.clientX - pressStartX, event.clientY - pressStartY)
+  const canvas = canvasEl.value
+  if (moved <= PRESS_TOLERANCE && canvas && !reduced.value && visible) {
+    const rect = canvas.getBoundingClientRect()
+    press.x = event.clientX - rect.left
+    press.y = event.clientY - rect.top
+    press.at = performance.now()
+    press.strength = 1
+    kick()
+  }
+  releasePointer()
 }
 
 function releasePointer(): void {
@@ -696,7 +716,7 @@ onMounted(async () => {
   // Touch: the finger lifting ends the gesture, so the tail starts to pull
   // itself in right away instead of waiting for a pointerleave that never
   // comes.
-  host.addEventListener('pointerup', releasePointer)
+  host.addEventListener('pointerup', endPress)
 
   resizeObserver = new ResizeObserver(scheduleRebuild)
   resizeObserver.observe(host)
@@ -735,7 +755,7 @@ onBeforeUnmount(() => {
   host?.removeEventListener('pointerdown', pressPointer)
   host?.removeEventListener('pointerleave', releasePointer)
   host?.removeEventListener('pointercancel', releasePointer)
-  host?.removeEventListener('pointerup', releasePointer)
+  host?.removeEventListener('pointerup', endPress)
   document.removeEventListener('visibilitychange', onDocumentHidden)
 })
 </script>

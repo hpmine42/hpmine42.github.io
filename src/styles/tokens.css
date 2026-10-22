@@ -15,7 +15,8 @@
   --dot-dim: #2b3036;
 
   /* Type */
-  --font-sans: 'Geist Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-sans:
+    'Geist Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --font-mono: 'Geist Mono Variable', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
 
   --step--1: clamp(0.8125rem, 0.79rem + 0.1vw, 0.875rem);

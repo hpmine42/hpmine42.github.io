@@ -94,6 +94,35 @@ button {
   outline-color: var(--signal);
 }
 
+/* Printing: the page is dark on purpose, but paper should not be. */
+@media print {
+  html,
+  body {
+    background: #fff;
+    color: #000;
+  }
+
+  .site-header,
+  .skip-link,
+  canvas,
+  .enough__glare,
+  .enough__backdrop {
+    display: none !important;
+  }
+
+  .enough,
+  .site-footer {
+    background: #fff !important;
+    color: #000 !important;
+    border-color: #999 !important;
+  }
+
+  a {
+    color: #000;
+    text-decoration: underline;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
