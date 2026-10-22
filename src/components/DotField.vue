@@ -12,15 +12,17 @@ import { useReducedMotion } from '../composables/useReducedMotion'
   that follows the pointer's path like a little animal — straight when
   you move straight, bending when you turn. It is deliberately plump:
   a solid bright head on the pointer, a broad body, a long tail, and
-  dots that swell as it passes. A tap or click leaves one clearly larger
-  dot that blooms where the pointer went down, then grows and fades
-  again. Dots near the worm light up signal blue and budge just a little;
-  per dot only the nearest segment counts, so the worm stays one clean
-  body and never piles up where it crosses itself. Text dots only yield a
-  little against a stiffer spring and a hard displacement cap, so the
-  word stays readable while you drag across it. The animation loop only
-  runs while something is moving, and never while the canvas is off
-  screen.
+  dots that swell as it passes. The body is evened out over the last few
+  path points, so it reads as one clean curve instead of a jittery
+  stroke. When the pointer stops, the tail does not freeze: it retracts
+  into the head and the head fades, until nothing is left — moving again
+  grows a fresh tail from the new spot. A tap or click leaves one clearly
+  larger dot that blooms where the pointer went down, then grows and
+  fades again. Dots near the worm light up signal blue; the letters of the
+  name lean away noticeably more than the rest of the field, but against a
+  stiffer spring and a hard displacement cap, so the word stays readable.
+  The animation loop only runs while something is moving, and never while
+  the canvas is off screen.
 */
 
 const props = defineProps<{ text: string }>()
@@ -72,6 +74,8 @@ let visibilityObserver: IntersectionObserver | null = null
 let colorDim = '#2b3036'
 let colorText = '#e9e7e2'
 let colorSignal = '#8aa2ff'
+/** 1 while the pointer moves, falling to 0 while it rests (tail retracts). */
+let wormLife = 0
 /* x/y is the lagging circle position the physics uses, tx/ty the raw
    pointer target it eases toward. */
 const pointer = { x: -9999, y: -9999, tx: -9999, ty: -9999, active: false }
@@ -80,9 +84,14 @@ const pointer = { x: -9999, y: -9999, tx: -9999, ty: -9999, active: false }
 const wormPath: Array<{ x: number; y: number }> = []
 const WORM_SEGMENTS = 18
 const WORM_SPACING = 18
+/** A resting pointer keeps its tail this long, then the tail retracts. */
+const WORM_HOLD_MS = 120
+const WORM_RETRACT_MS = 640
 /** A dot that blooms where the pointer was pressed, then grows and fades. */
 const press = { x: 0, y: 0, at: Number.NEGATIVE_INFINITY, strength: 0 }
 const PRESS_MS = 620
+/** performance.now() of the last real pointer movement, for the retraction. */
+let lastMoveAt = 0
 /** performance.now() timestamp of the intro assembly (0 = no intro running). */
 let introStart = 0
 
@@ -276,7 +285,7 @@ function draw(): void {
       const mag = Math.hypot(g.dx[i] ?? 0, g.dy[i] ?? 0)
       const swell =
         1 +
-        Math.min(mag / (g.spacing * 2.2), 1) * (g.inText[i] === 1 ? 0.35 : 1.1) +
+        Math.min(mag / (g.spacing * 2.2), 1) * (g.inText[i] === 1 ? 0.55 : 1.1) +
         (kind === KIND_SIGNAL ? (g.glow[i] ?? 0) * 1.45 : 0)
       const r =
         (g.inText[i] === 1 ? radiusText : kind === KIND_SIGNAL ? radiusDim * 2.15 : radiusDim) * swell
@@ -289,18 +298,20 @@ function draw(): void {
   // The worm's head: a solid circle right on the pointer, a little larger
   // than before, wrapped in two soft halos so it reads as a bright lamp
   // dragging the tail behind it.
-  if (pointer.active && !reduced.value) {
-    const headR = g.spacing * 0.78
+  if (pointer.active && !reduced.value && wormLife > 0.02) {
+    // The head shrinks and dims with the retracting body, so a stopped
+    // pointer leaves an empty field once the tail is gone.
+    const headR = g.spacing * 0.78 * (0.55 + 0.45 * wormLife)
     c.fillStyle = colorSignal
-    c.globalAlpha = 0.16
+    c.globalAlpha = 0.16 * wormLife
     c.beginPath()
     c.arc(pointer.x, pointer.y, headR * 2.2, 0, TAU)
     c.fill()
-    c.globalAlpha = 0.3
+    c.globalAlpha = 0.3 * wormLife
     c.beginPath()
     c.arc(pointer.x, pointer.y, headR * 1.5, 0, TAU)
     c.fill()
-    c.globalAlpha = 0.95
+    c.globalAlpha = 0.95 * wormLife
     c.beginPath()
     c.arc(pointer.x, pointer.y, headR, 0, TAU)
     c.fill()
@@ -332,6 +343,15 @@ function step(now: number): void {
   const pressAge = now - press.at
   press.strength = pressAge >= 0 && pressAge < PRESS_MS ? 1 - pressAge / PRESS_MS : 0
 
+  // How much worm is left: full while the pointer moves, then it retracts
+  // over a moment until the field has nothing on it again.
+  const idleFor = now - lastMoveAt
+  wormLife = !pointer.active
+    ? 0
+    : idleFor <= WORM_HOLD_MS
+      ? 1
+      : Math.max(0, 1 - (idleFor - WORM_HOLD_MS) / WORM_RETRACT_MS)
+
   // Follow the pointer closely, with just a little lag.
   if (pointer.active) {
     const glide = 1 - Math.pow(0.35, dt)
@@ -339,7 +359,7 @@ function step(now: number): void {
     pointer.y += (pointer.ty - pointer.y) * glide
 
     const newest = wormPath[0]
-    if (!newest || Math.hypot(pointer.x - newest.x, pointer.y - newest.y) > 3) {
+    if (!newest || Math.hypot(pointer.x - newest.x, pointer.y - newest.y) > 4) {
       wormPath.unshift({ x: pointer.x, y: pointer.y })
       if (wormPath.length > 150) wormPath.pop()
     }
@@ -354,11 +374,15 @@ function step(now: number): void {
   const wormX = new Float32Array(WORM_SEGMENTS)
   const wormY = new Float32Array(WORM_SEGMENTS)
   let wormCount = 0
-  if (pointer.active && wormPath.length > 0) {
+  // Only the part of the body that is still alive gets laid down; the rest
+  // of the path simply stays unused, so the tail shortens from the tip.
+  const reach = WORM_SPACING * (WORM_SEGMENTS - 1) * wormLife
+  if (pointer.active && wormLife > 0 && wormPath.length > 0) {
     let seg = 1 // current path segment (wormPath[seg-1] -> wormPath[seg])
     let walked = 0 // path length covered before that segment
     for (let s = 0; s < WORM_SEGMENTS; s += 1) {
       const target = s * WORM_SPACING
+      if (target > reach) break
       while (seg < wormPath.length) {
         const a = wormPath[seg - 1]
         const b = wormPath[seg]
@@ -377,6 +401,18 @@ function step(now: number): void {
       wormY[s] = a.y + (b.y - a.y) * t
       wormCount = s + 1
     }
+  }
+
+  // Order: one light smoothing pass along the body. It evens out the small
+  // wobbles of raw pointer samples, so the worm reads as a tidy curve
+  // instead of a scribble, while the head stays exactly on the pointer.
+  for (let s = 1; s < wormCount - 1; s += 1) {
+    const px = wormX[s - 1] ?? 0
+    const py = wormY[s - 1] ?? 0
+    const nx = wormX[s + 1] ?? 0
+    const ny = wormY[s + 1] ?? 0
+    wormX[s] = (px + 2 * (wormX[s] ?? 0) + nx) / 4
+    wormY[s] = (py + 2 * (wormY[s] ?? 0) + ny) / 4
   }
 
   const damping = Math.pow(DAMPING, dt)
@@ -404,8 +440,9 @@ function step(now: number): void {
     }
 
     const isText = g.inText[i] === 1
-    // The word resists: text dots feel only about half the push.
-    const give = isText ? 0.45 : 1
+    // The word reacts clearly when the worm touches it, but still resists
+    // compared to the free field, so the letters stay letters.
+    const give = isText ? 0.7 : 1
     let dx = g.dx[i] ?? 0
     let dy = g.dy[i] ?? 0
     let vx = g.vx[i] ?? 0
@@ -473,7 +510,7 @@ function step(now: number): void {
     // Hard cap on travel, tight for text dots (about 2 dot spacings): the
     // letters can lean away from the pointer but never tear apart. Not
     // applied during the intro, where dots legitimately start far away.
-    const cap = g.spacing * (isText ? 2.1 : 3.6)
+    const cap = g.spacing * (isText ? 2.5 : 3.6)
     const travel = Math.hypot(dx, dy)
     if (introStart === 0 && travel > cap) {
       dx = (dx / travel) * cap
@@ -502,6 +539,8 @@ function step(now: number): void {
 
   if (introStart > 0 && !moving) introStart = 0
   if (press.strength > 0) moving = true
+  // Keep stepping while the tail is still pulling itself in.
+  if (pointer.active && wormLife > 0) moving = true
 
   if (!moving && !displaced) {
     g.dx.fill(0)
@@ -525,8 +564,14 @@ function updatePointer(event: PointerEvent): void {
   const canvas = canvasEl.value
   if (!canvas || reduced.value || !visible) return
   const rect = canvas.getBoundingClientRect()
-  pointer.tx = event.clientX - rect.left
-  pointer.ty = event.clientY - rect.top
+  const nextX = event.clientX - rect.left
+  const nextY = event.clientY - rect.top
+  if (Math.hypot(nextX - pointer.tx, nextY - pointer.ty) > 0.5 || !pointer.active) {
+    lastMoveAt = performance.now()
+    wormLife = 1
+  }
+  pointer.tx = nextX
+  pointer.ty = nextY
   if (!pointer.active) {
     // Snap on entry so the field does not sweep in from the last visit,
     // and start a fresh tail at the entry point.
