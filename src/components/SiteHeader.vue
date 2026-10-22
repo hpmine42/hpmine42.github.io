@@ -142,13 +142,14 @@ onBeforeUnmount(() => {
   gap: clamp(0.75rem, 2vw, 2rem);
   max-width: var(--content-max);
   margin-inline: auto;
-  padding: 0.2rem 0.35rem 0.2rem 0.85rem;
-  /* A light frosted pane from the start, so the links never sit on raw dots;
-     it turns into darker glass after a little scrolling. */
-  border: 1px solid rgba(138, 162, 255, 0.08);
-  border-radius: 999px;
-  background: rgba(18, 20, 22, 0.32);
-  backdrop-filter: blur(8px) saturate(1.08);
+  padding: 0.2rem 0.3rem 0.2rem 0.9rem;
+  /* Barely more than a hint of glass from the start — the points of the hero
+     show through — and a little denser after scrolling. Corners stay almost
+     square, so the bar reads as a strip rather than a pill. */
+  border: 1px solid rgba(138, 162, 255, 0.07);
+  border-radius: 6px;
+  background: rgba(18, 20, 22, 0.16);
+  backdrop-filter: blur(10px) saturate(1.1);
   transition:
     background-color 0.45s var(--ease-out),
     border-color 0.45s var(--ease-out),
@@ -157,8 +158,8 @@ onBeforeUnmount(() => {
 }
 
 .site-header[data-scrolled='true'] .site-header__bar {
-  border-color: rgba(138, 162, 255, 0.16);
-  background: rgba(18, 20, 22, 0.72);
+  border-color: rgba(138, 162, 255, 0.14);
+  background: rgba(18, 20, 22, 0.5);
   box-shadow:
     0 1px 0 rgba(255, 255, 255, 0.04) inset,
     0 1rem 2.5rem -1.5rem rgba(0, 0, 0, 0.9);
@@ -168,7 +169,11 @@ onBeforeUnmount(() => {
 /* Without backdrop-filter the pane would be nearly invisible: use a solid one. */
 @supports not (backdrop-filter: blur(1px)) {
   .site-header__bar {
-    background: rgba(18, 20, 22, 0.72);
+    background: rgba(18, 20, 22, 0.6);
+  }
+
+  .site-header[data-scrolled='true'] .site-header__bar {
+    background: rgba(18, 20, 22, 0.78);
   }
 }
 
@@ -235,7 +240,7 @@ onBeforeUnmount(() => {
   height: 2.15rem;
   margin-top: -1.075rem;
   border: 1px solid rgba(138, 162, 255, 0.22);
-  border-radius: 999px;
+  border-radius: 4px;
   background: rgba(138, 162, 255, 0.1);
   opacity: 0;
   transition:
@@ -254,7 +259,7 @@ onBeforeUnmount(() => {
   align-items: center;
   min-height: 2.75rem;
   padding: 0 0.7rem;
-  border-radius: 999px;
+  border-radius: 4px;
   color: var(--paper-muted);
   font-size: var(--step--1);
   font-weight: 500;
@@ -281,7 +286,7 @@ onBeforeUnmount(() => {
   margin-block: 0.2rem;
   padding: 0 0.85rem;
   border: 1px solid var(--graphite-line-strong);
-  border-radius: 999px;
+  border-radius: 4px;
   color: var(--paper);
   font-size: var(--step--1);
   font-weight: 500;
