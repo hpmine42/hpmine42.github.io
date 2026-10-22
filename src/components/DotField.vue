@@ -10,18 +10,20 @@ import { useReducedMotion } from '../composables/useReducedMotion'
   signal blue as it locks into place (about 2 seconds in total). The
   pointer carries a small worm: a short chain of evenly spaced segments
   that follows the pointer's path like a little animal — straight when
-  you move straight, bending when you turn. It is a small, solid tail:
-  one continuous filled body that tapers from a round head on the pointer,
-  so nothing in it looks hollow, and the dots underneath only glow along
-  its edge instead of being shovelled aside. The body is evened out over
-  the last few path points, so it reads as one clean curve instead of a
-  jittery stroke. When the pointer stops, the tail does not freeze: it retracts
-  into the head and the head fades, until nothing is left — moving again
-  grows a fresh tail from the new spot. A tap or click leaves one clearly
-  larger dot that blooms where the pointer went down, then grows and
-  fades again. Dots near the worm light up signal blue; the letters of the
-  name lean away noticeably more than the rest of the field, but against a
-  stiffer spring and a hard displacement cap, so the word stays readable.
+  you move straight, bending when you turn. The trail is made by the dot
+  field itself: every dot the body passes over turns signal blue and
+  swells until it nearly touches its neighbours, and the dots are barely
+  pushed aside — so the middle of the trail is filled with lit dots
+  instead of being a hollow tube. Only the head is a single small solid
+  dot. The body is evened out over the last few path points, so it reads
+  as one clean curve instead of a jittery stroke. When the pointer stops,
+  the tail does not freeze: it retracts into the head and the head fades,
+  until nothing is left — moving again grows a fresh tail from the new
+  spot. A tap or click leaves one clearly larger dot that blooms where
+  the pointer went down, then grows and fades again. Dots near the worm
+  light up signal blue; the letters of the name lean away noticeably more
+  than the rest of the field, but against a stiffer spring and a hard
+  displacement cap, so the word stays readable.
   The animation loop only runs while something is moving, and never while
   the canvas is off screen.
 */
@@ -291,54 +293,23 @@ function draw(): void {
       const swell =
         1 +
         Math.min(mag / (g.spacing * 2.2), 1) * (g.inText[i] === 1 ? 0.55 : 1.1) +
-        (kind === KIND_SIGNAL ? (g.glow[i] ?? 0) * 1.05 : 0)
+        (kind === KIND_SIGNAL ? (g.glow[i] ?? 0) * (g.inText[i] === 1 ? 0.5 : 1.35) : 0)
       const r =
-        (g.inText[i] === 1 ? radiusText : kind === KIND_SIGNAL ? radiusDim * 2.15 : radiusDim) * swell
+        (g.inText[i] === 1 ? radiusText : kind === KIND_SIGNAL ? radiusDim * 2.6 : radiusDim) * swell
       c.moveTo(x + r, y)
       c.arc(x, y, r, 0, TAU)
     }
     c.fill()
   }
 
-  // The worm itself: a filled body that tapers from the head to the tip,
-  // painted as one shape. It is solid all the way through — the dots only
-  // glow at its edge — so it never looks like a hollow tube.
-  if (pointer.active && !reduced.value && wormLife > 0.02 && wormCount > 0) {
-    const headR = g.spacing * 0.66 * (0.6 + 0.4 * wormLife)
-    // The body never gets thinner than this, so neighbouring segments still
-    // overlap and the tail stays one solid piece instead of a dotted line.
-    const bodyFloor = WORM_SPACING * 0.62
-    const taper = (index: number): number =>
-      Math.max(bodyFloor, headR * (1 - 0.5 * (index / Math.max(1, WORM_SEGMENTS - 1))))
-
+  // The head: one small solid dot on the pointer. Everything else about
+  // the trail is made of the field's own dots, which turn signal blue and
+  // swell where the body passes — including the dots right inside it, so
+  // the trail is filled instead of hollow.
+  if (pointer.active && !reduced.value && wormLife > 0.02) {
+    const headR = g.spacing * 0.44 * (0.7 + 0.3 * wormLife)
     c.fillStyle = colorSignal
-    // A soft halo along the whole body.
-    c.globalAlpha = 0.1 * wormLife
-    c.beginPath()
-    for (let s = 0; s < wormCount; s += 1) {
-      const r = headR * taper(s) * 2.1
-      c.moveTo((wormX[s] ?? 0) + r, wormY[s] ?? 0)
-      c.arc(wormX[s] ?? 0, wormY[s] ?? 0, r, 0, TAU)
-    }
-    c.fill()
-
-    // The body proper.
-    c.globalAlpha = 0.85 * wormLife
-    c.beginPath()
-    for (let s = 0; s < wormCount; s += 1) {
-      const r = headR * taper(s)
-      c.moveTo((wormX[s] ?? 0) + r, wormY[s] ?? 0)
-      c.arc(wormX[s] ?? 0, wormY[s] ?? 0, r, 0, TAU)
-    }
-    c.fill()
-
-    // The head: solid on the pointer, with one halo.
-    const haloR = headR * 1.7
-    c.globalAlpha = 0.22 * wormLife
-    c.beginPath()
-    c.arc(pointer.x, pointer.y, haloR, 0, TAU)
-    c.fill()
-    c.globalAlpha = 0.96 * wormLife
+    c.globalAlpha = 0.9 * wormLife
     c.beginPath()
     c.arc(pointer.x, pointer.y, headR, 0, TAU)
     c.fill()
@@ -485,7 +456,7 @@ function step(now: number): void {
       const dotY = (g.baseY[i] ?? 0) + dy
       for (let s = 0; s < wormCount; s += 1) {
         const fade = 1 - s / WORM_SEGMENTS
-        const segRadius = 13 + 18 * fade
+        const segRadius = 14 + 20 * fade
         const ex = dotX - (wormX[s] ?? 0)
         const ey = dotY - (wormY[s] ?? 0)
         const dist = Math.hypot(ex, ey)
@@ -499,7 +470,9 @@ function step(now: number): void {
       }
       wormGlow = best
       if (best > 0) {
-        const push = best * best * 1.15 * give * dt
+        // Barely any push: the dots should stay where they are and light up,
+        // so the middle of the trail is full instead of being cleared out.
+        const push = best * best * 0.35 * give * dt
         vx += bestX * push
         vy += bestY * push
       }
