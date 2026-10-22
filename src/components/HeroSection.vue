@@ -8,7 +8,10 @@ import DotField from './DotField.vue'
     <DotField :text="profile.name" />
     <h1 id="hero-title" class="sr-only">{{ profile.name }}</h1>
     <div class="hero__foot">
-      <p class="hero__role">{{ profile.role }}</p>
+      <div class="hero__lead">
+        <p class="hero__role">{{ profile.role }}</p>
+        <p class="hero__hint">Move your pointer across the name</p>
+      </div>
       <a class="hero__cue" href="#enough">enough.</a>
     </div>
   </section>
@@ -37,6 +40,25 @@ import DotField from './DotField.vue'
   pointer-events: none;
 }
 
+.hero__lead {
+  display: grid;
+  gap: 0.35rem;
+}
+
+/* Only makes sense with a mouse; touch devices never see it. */
+.hero__hint {
+  font-family: var(--font-mono);
+  font-size: var(--step--1);
+  letter-spacing: 0.02em;
+  color: var(--fg-muted);
+}
+
+@media (pointer: coarse) {
+  .hero__hint {
+    display: none;
+  }
+}
+
 .hero__role {
   font-size: var(--step-1);
   line-height: 1.2;
@@ -45,6 +67,9 @@ import DotField from './DotField.vue'
 }
 
 .hero__cue {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.75rem;
   font-size: var(--step--1);
   color: var(--fg-muted);
   text-decoration: none;

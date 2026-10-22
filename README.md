@@ -32,6 +32,10 @@ Vite prints the local address (usually <http://localhost:5173/>). The dev server
 | ------------------- | ------------------------------------------------------------- |
 | `npm run dev`       | Start the dev server                                          |
 | `npm run typecheck` | Run `vue-tsc` for the app and for the Vite config             |
+| `npm run lint`      | ESLint (Vue + TypeScript rules, Prettier-compatible)          |
+| `npm run format`    | Format everything with Prettier                               |
+| `npm test`          | Run the Vitest suite once (`test:watch` while working)        |
+| `npm run verify`    | Type-check, lint, test and build — what CI runs               |
 | `npm run build`     | Type-check, then create the production build in `dist/`       |
 | `npm run preview`   | Serve the production build locally (<http://localhost:4173/>) |
 
@@ -41,7 +45,7 @@ The site is served from the root of `https://hpmine42.github.io/`, so the Vite `
 
 1. Use the repository **`hpmine42/hpmine42.github.io`** (the user site repository) and put these files at its root. Commit `package-lock.json`: the workflow runs `npm ci`.
 2. In the repository open **Settings, Pages** and set **Source** to **GitHub Actions**.
-3. Push to `main`. `.github/workflows/deploy.yml` installs the dependencies, runs the type check and the build, and publishes `dist/`. You can also start it manually from the **Actions** tab (`workflow_dispatch`).
+3. Push to `main`. `.github/workflows/deploy.yml` installs the dependencies, runs lint, the formatting check, the tests and the build, and publishes `dist/`. You can also start it manually from the **Actions** tab (`workflow_dispatch`).
 
 ### Important: do not create an `enough/` folder here
 
@@ -56,8 +60,11 @@ public/og.jpg                  Social share image (1200 x 630)
 public/robots.txt              Crawler rules, points at the sitemap
 public/sitemap.xml             Single-URL sitemap
 public/404.html                Static 404 page for GitHub Pages
+tests/                         Vitest suites (name layout, trail easing, content)
 src/
   main.ts                      Entry point, fonts and global styles
+  utils/name-layout.ts         Weight and line split of the dot-matrix name
+  utils/trail.ts               How the pointer tail grows and retracts
   App.vue                      Page composition
   data/content.ts              All copy, links and navigation items
   styles/tokens.css            Colours, type scale, spacing, motion tokens
@@ -84,6 +91,16 @@ All text, links and navigation items live in `src/data/content.ts`.
 - **All repositories**: <https://github.com/hpmine42?tab=repositories>
 
 The `enough` object holds the kicker ("Selected project"), the summary, the three highlights and the facts; `elsewhere` holds the note that the rest of the work is on GitHub. The description and the facts follow the README of the enough. repository. If enough. changes, update those objects.
+
+## Tests, lint and formatting
+
+- `tests/` holds plain Vitest suites for the parts that are logic rather than
+  visuals: how the name is split into lines at which width, how the pointer tail
+  eases in and out (including broken frame deltas), and that the content objects
+  stay consistent (three highlights, short nav, GitHub destinations).
+- ESLint runs the recommended JS/TS/Vue rule sets plus Prettier compatibility;
+  Prettier owns the layout (`printWidth` 100, no semicolons, single quotes).
+- CI runs all three before the build, so a red check blocks the deploy.
 
 ## Metadata
 

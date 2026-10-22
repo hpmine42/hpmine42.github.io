@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { elsewhere, enough } from '../data/content'
+import { elsewhere, enough, moreRepos } from '../data/content'
 import { useReducedMotion } from '../composables/useReducedMotion'
 import { useScrollProgressVar } from '../composables/useScrollProgressVar'
 import EnoughBackdrop from './EnoughBackdrop.vue'
@@ -108,7 +108,9 @@ function resetPanel(): void {
               data-reveal
               :style="{ '--reveal-delay': 220 + index * 90 }"
             >
-              <span class="enough__hindex" aria-hidden="true">{{ String(index + 1).padStart(2, '0') }}</span>
+              <span class="enough__hindex" aria-hidden="true">{{
+                String(index + 1).padStart(2, '0')
+              }}</span>
               <div>
                 <h3 class="enough__htitle">{{ item.title }}</h3>
                 <p class="enough__htext">{{ item.text }}</p>
@@ -152,17 +154,48 @@ function resetPanel(): void {
       </div>
 
       <!-- The rest of the work: one clear door to GitHub. -->
-      <aside class="enough__elsewhere" data-reveal style="--reveal-delay: 340" aria-labelledby="elsewhere-title">
+      <aside
+        class="enough__elsewhere"
+        data-reveal
+        style="--reveal-delay: 340"
+        aria-labelledby="elsewhere-title"
+      >
         <div class="enough__elsewhere-copy">
           <p class="enough__eyebrow">{{ elsewhere.eyebrow }}</p>
           <h3 id="elsewhere-title" class="enough__elsewhere-title">{{ elsewhere.title }}</h3>
           <p class="enough__elsewhere-text">{{ elsewhere.text }}</p>
+
+          <ul class="enough__repos">
+            <li v-for="repo in moreRepos" :key="repo.repo">
+              <a
+                class="enough__repo"
+                :href="repo.liveUrl ?? repo.url"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <span class="enough__repo-name">{{ repo.label }}</span>
+                <span class="enough__repo-meta">
+                  <span class="enough__repo-lang">{{ repo.language }}</span>
+                  <span v-if="repo.liveUrl" class="enough__repo-live">live</span>
+                  <span v-else class="enough__repo-live enough__repo-live--repo">repo</span>
+                </span>
+                <span class="sr-only"> (opens in a new tab)</span>
+              </a>
+            </li>
+          </ul>
         </div>
 
         <ExternalLink class="enough__elsewhere-link" :href="elsewhere.url" variant="button">
           <GitHubMark class="enough__elsewhere-mark" />
           <span>{{ elsewhere.label }}</span>
-          <svg class="enough__arrow" viewBox="0 0 20 20" width="18" height="18" aria-hidden="true" focusable="false">
+          <svg
+            class="enough__arrow"
+            viewBox="0 0 20 20"
+            width="18"
+            height="18"
+            aria-hidden="true"
+            focusable="false"
+          >
             <path
               d="M3 10h13M11 4.5 16.5 10 11 15.5"
               fill="none"
@@ -192,9 +225,7 @@ function resetPanel(): void {
   isolation: isolate;
   overflow-x: clip;
   padding: var(--section-y) var(--gutter);
-  background:
-    radial-gradient(90% 60% at 50% 0%, #171a1f 0%, transparent 70%),
-    var(--bg);
+  background: radial-gradient(90% 60% at 50% 0%, #171a1f 0%, transparent 70%), var(--bg);
   color: var(--fg);
 }
 
@@ -523,6 +554,77 @@ function resetPanel(): void {
 
 .enough__panel-body {
   padding: clamp(1.1rem, 3vw, 1.75rem);
+}
+
+/* The small projects next to the GitHub note. */
+.enough__repos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: 0.6rem;
+  margin-top: clamp(1.25rem, 3vw, 1.75rem);
+}
+
+.enough__repo {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  background: rgba(18, 20, 22, 0.55);
+  color: var(--fg);
+  text-decoration: none;
+  transition:
+    border-color 0.3s var(--ease-out),
+    background-color 0.3s var(--ease-out),
+    transform 0.3s var(--ease-out);
+}
+
+.enough__repo:hover,
+.enough__repo:focus-visible {
+  border-color: rgba(138, 162, 255, 0.45);
+  background: rgba(28, 32, 37, 0.75);
+  transform: translateY(-1px);
+}
+
+.enough__repo-name {
+  font-size: var(--step--1);
+  font-weight: 550;
+  letter-spacing: -0.01em;
+}
+
+.enough__repo-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+}
+
+.enough__repo-lang::before {
+  content: '';
+  display: inline-block;
+  width: 0.4rem;
+  height: 0.4rem;
+  margin-right: 0.35rem;
+  border-radius: 50%;
+  background: var(--accent);
+  vertical-align: 0.05em;
+}
+
+.enough__repo-live {
+  margin-left: auto;
+  padding: 0.1rem 0.35rem;
+  border: 1px solid rgba(138, 162, 255, 0.35);
+  border-radius: 3px;
+  color: rgba(138, 162, 255, 0.85);
+}
+
+.enough__repo-live--repo {
+  border-color: var(--rule-strong);
+  color: var(--fg-muted);
 }
 
 /* The door to GitHub. */

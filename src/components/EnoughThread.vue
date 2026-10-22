@@ -154,7 +154,14 @@ onBeforeUnmount(() => {
 
     <figcaption class="thread__caption">
       <span class="thread__status">
-        <svg class="thread__lock" viewBox="0 0 14 14" width="13" height="13" aria-hidden="true" focusable="false">
+        <svg
+          class="thread__lock"
+          viewBox="0 0 14 14"
+          width="13"
+          height="13"
+          aria-hidden="true"
+          focusable="false"
+        >
           <path
             d="M4 6V4.5a3 3 0 0 1 6 0V6"
             fill="none"
@@ -162,7 +169,16 @@ onBeforeUnmount(() => {
             stroke-width="1.3"
             stroke-linecap="round"
           />
-          <rect x="2.6" y="6" width="8.8" height="6.2" rx="1.4" fill="none" stroke="currentColor" stroke-width="1.3" />
+          <rect
+            x="2.6"
+            y="6"
+            width="8.8"
+            height="6.2"
+            rx="1.4"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.3"
+          />
         </svg>
         End-to-end encrypted
       </span>
@@ -359,8 +375,8 @@ onBeforeUnmount(() => {
 .thread__replay {
   display: inline-grid;
   place-items: center;
-  width: 2rem;
-  height: 2rem;
+  width: 2.75rem;
+  height: 2.75rem;
   padding: 0;
   border: 1px solid var(--rule-strong);
   border-radius: 50%;

@@ -49,7 +49,7 @@ defineProps<{ active: string }>()
 
 .site-header__list {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: clamp(1.1rem, 3vw, 2rem);
   max-width: var(--content-max);
   margin-inline: auto;
@@ -61,7 +61,10 @@ defineProps<{ active: string }>()
 
 .site-header__link {
   position: relative;
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  /* 44px is the smallest comfortable touch target. */
+  min-height: 2.75rem;
   padding-block: 0.4rem;
   font-size: var(--step--1);
   font-weight: 500;
