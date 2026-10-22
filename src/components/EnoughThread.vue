@@ -295,6 +295,9 @@ onBeforeUnmount(() => {
   position: relative;
   display: block;
   min-height: 2.6rem;
+  /* The message is one line, always — also while it is still ciphertext.
+     The bubble never grows to a second line, not even for a frame. */
+  white-space: nowrap;
   overflow: hidden;
   border: 1px solid var(--rule);
   background: linear-gradient(180deg, rgba(30, 34, 39, 0.95), rgba(22, 25, 28, 0.95));
@@ -307,7 +310,9 @@ onBeforeUnmount(() => {
 }
 
 /* The ghost keeps the box at the size of the final sentence; the animated
-   copy sits exactly on top of it. Nothing reflows while it resolves. */
+   copy sits exactly on top of it. Both are single-line, and because the
+   font is monospace the scrambled text has exactly the same width as the
+   finished sentence. Nothing reflows and nothing wraps while it resolves. */
 .thread__sizer {
   display: block;
   visibility: hidden;
@@ -318,6 +323,7 @@ onBeforeUnmount(() => {
   top: var(--pad-y);
   left: var(--pad-x);
   right: var(--pad-x);
+  white-space: nowrap;
 }
 
 .thread[data-phase='done'] .thread__bubble--in {
