@@ -100,7 +100,10 @@ onBeforeUnmount(() => {
   <figure ref="root" class="thread" :data-phase="phase">
     <div class="thread__track" aria-hidden="true">
       <span class="thread__node" />
-      <span class="thread__line"><span class="thread__packet" /></span>
+      <span class="thread__line">
+        <span class="thread__fill" />
+        <span class="thread__packet" />
+      </span>
       <span class="thread__node" />
     </div>
     <div class="thread__names" aria-hidden="true">
@@ -114,7 +117,19 @@ onBeforeUnmount(() => {
     </p>
 
     <figcaption class="thread__caption">
-      <span>End-to-end encrypted</span>
+      <span class="thread__status">
+        <svg class="thread__lock" viewBox="0 0 14 14" width="13" height="13" aria-hidden="true" focusable="false">
+          <path
+            d="M4 6V4.5a3 3 0 0 1 6 0V6"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.3"
+            stroke-linecap="round"
+          />
+          <rect x="2.6" y="6" width="8.8" height="6.2" rx="1.4" fill="none" stroke="currentColor" stroke-width="1.3" />
+        </svg>
+        End-to-end encrypted
+      </span>
       <button
         class="thread__replay"
         type="button"
@@ -152,6 +167,30 @@ onBeforeUnmount(() => {
   background: var(--rule-strong);
 }
 
+/* The travelled part of the line lights up behind the packet. */
+.thread__fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 0;
+  background: linear-gradient(90deg, transparent, var(--accent));
+  opacity: 0;
+}
+
+.thread[data-phase='sending'] .thread__fill {
+  width: 100%;
+  opacity: 0.8;
+  transition:
+    width 1.5s var(--ease-in-out),
+    opacity 0.2s linear;
+}
+
+.thread[data-phase='decrypting'] .thread__fill,
+.thread[data-phase='done'] .thread__fill {
+  width: 100%;
+  opacity: 0.35;
+  transition: opacity 0.5s linear;
+}
+
 .thread__packet {
   position: absolute;
   top: 50%;
@@ -162,6 +201,9 @@ onBeforeUnmount(() => {
   border-radius: 50%;
   background: var(--accent);
   opacity: 0;
+  box-shadow:
+    0 0 0.5rem rgba(138, 162, 255, 0.8),
+    0 0 1.5rem rgba(138, 162, 255, 0.45);
 }
 
 .thread[data-phase='sending'] .thread__packet {
@@ -202,6 +244,19 @@ onBeforeUnmount(() => {
 
 .thread[data-phase='done'] .thread__message {
   color: var(--fg);
+  text-shadow: 0 0 1.5rem rgba(138, 162, 255, 0.35);
+}
+
+.thread__status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.thread__lock {
+  flex: none;
+  color: var(--accent);
+  opacity: 0.8;
 }
 
 .thread__caption {
