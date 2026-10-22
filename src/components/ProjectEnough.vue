@@ -167,19 +167,11 @@ function resetPanel(): void {
 
           <ul class="enough__repos">
             <li v-for="(repo, index) in moreRepos" :key="repo.repo">
-              <a
-                class="enough__repo"
-                :href="repo.liveUrl ?? repo.url"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <span class="enough__repo-top">
-                  <span class="enough__repo-name">{{ repo.label }}</span>
-                  <span class="enough__repo-arrow" aria-hidden="true">↗</span>
-                </span>
+              <a class="enough__repo" :href="repo.url" target="_blank" rel="noopener noreferrer">
                 <span class="enough__repo-index" aria-hidden="true">
                   {{ String(index + 1).padStart(2, '0') }}
                 </span>
+                <span class="enough__repo-name">{{ repo.label }}</span>
                 <span class="sr-only"> (opens in a new tab)</span>
               </a>
             </li>
@@ -189,23 +181,6 @@ function resetPanel(): void {
         <ExternalLink class="enough__elsewhere-link" :href="elsewhere.url" variant="button">
           <GitHubMark class="enough__elsewhere-mark" />
           <span>{{ elsewhere.label }}</span>
-          <svg
-            class="enough__arrow"
-            viewBox="0 0 20 20"
-            width="18"
-            height="18"
-            aria-hidden="true"
-            focusable="false"
-          >
-            <path
-              d="M3 10h13M11 4.5 16.5 10 11 15.5"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="1.5"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            />
-          </svg>
         </ExternalLink>
       </aside>
     </div>
@@ -560,22 +535,23 @@ function resetPanel(): void {
 /* The small projects next to the GitHub note. */
 .enough__repos {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
-  column-gap: clamp(1.25rem, 3vw, 2rem);
+  grid-template-columns: 1fr;
   margin-top: clamp(1.5rem, 3vw, 2rem);
   border-top: 1px solid var(--rule);
 }
 
 /*
-  The small projects are a quiet list of names: no language, no status, no
-  badges. On hover the name slides a little, the arrow steps out and a thin
-  signal line grows in from the left.
+  The small projects are a quiet list of names, one under the other: no
+  language, no status, no badges, no arrows. On hover the row's number lights
+  up, the name slides a little and a thin signal line grows along the bottom.
 */
 .enough__repo {
   position: relative;
   display: grid;
-  gap: 0.55rem;
-  padding: 0.75rem 0.15rem 0.75rem 0;
+  grid-template-columns: 2rem minmax(0, 1fr);
+  align-items: baseline;
+  gap: 0 0.75rem;
+  padding: 0.8rem 0.15rem 0.8rem 0;
   border-bottom: 1px solid var(--rule);
   color: var(--fg);
   text-decoration: none;
@@ -598,13 +574,6 @@ function resetPanel(): void {
   transform: scaleX(1);
 }
 
-.enough__repo-top {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 0.75rem;
-}
-
 .enough__repo-name {
   font-size: var(--step-0);
   font-weight: 550;
@@ -617,28 +586,12 @@ function resetPanel(): void {
   transform: translateX(0.2rem);
 }
 
-.enough__repo-arrow {
-  flex: none;
-  font-size: 0.875rem;
-  color: var(--fg-muted);
-  transform: translate(-0.15rem, 0.15rem);
-  transition:
-    transform 0.35s var(--ease-out),
-    color 0.3s var(--ease-out);
-}
-
-.enough__repo:hover .enough__repo-arrow,
-.enough__repo:focus-visible .enough__repo-arrow {
-  color: var(--accent);
-  transform: translate(0.1rem, -0.1rem);
-}
-
 .enough__repo-index {
   font-family: var(--font-mono);
   font-size: 0.6875rem;
   letter-spacing: 0.1em;
-  color: var(--fg-muted);
-  opacity: 0.6;
+  color: var(--accent);
+  opacity: 0.45;
   transition: opacity 0.3s var(--ease-out);
 }
 
@@ -705,15 +658,6 @@ function resetPanel(): void {
 .enough__elsewhere-mark {
   width: 1.05rem;
   height: 1.05rem;
-}
-
-.enough__arrow {
-  transition: transform 0.35s var(--ease-out);
-}
-
-.enough__elsewhere-link:hover .enough__arrow,
-.enough__elsewhere-link:focus-visible .enough__arrow {
-  transform: translateX(0.25rem);
 }
 
 @media (max-width: 52rem) {
