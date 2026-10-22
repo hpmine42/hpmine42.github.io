@@ -65,7 +65,6 @@ export interface RepoCard {
   readonly label: string
   readonly repo: string
   readonly url: string
-  readonly liveUrl?: string
 }
 
 /* Smaller projects, shown as a short strip next to the GitHub note. Static on
@@ -75,19 +74,16 @@ export const moreRepos: readonly RepoCard[] = [
     label: 'JSON Opener',
     repo: 'json-opener-on-android-',
     url: 'https://github.com/hpmine42/json-opener-on-android-',
-    liveUrl: 'https://hpmine42.github.io/json-opener-on-android-/',
   },
   {
     label: 'Minecraft clone',
     repo: 'Minecraft-Klon',
     url: 'https://github.com/hpmine42/Minecraft-Klon',
-    liveUrl: 'https://hpmine42.github.io/Minecraft-Klon/',
   },
   {
     label: 'Stopwatch',
     repo: 'Stopwatch',
     url: 'https://github.com/hpmine42/Stopwatch',
-    liveUrl: 'https://stopwatch-hpmine.vercel.app',
   },
 ]
 

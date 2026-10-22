@@ -19,12 +19,11 @@ describe('content', () => {
     expect(profile.githubUrl).toBe('https://github.com/hpmine42')
   })
 
-  it('shows a handful of smaller repositories with a live or repo destination', () => {
+  it('shows a handful of smaller repositories, each linking to its own repo', () => {
     expect(moreRepos.length).toBeGreaterThan(2)
     expect(moreRepos.length).toBeLessThanOrEqual(4)
     for (const repo of moreRepos) {
       expect(repo.url).toMatch(/^https:\/\/github\.com\/hpmine42\//)
-      if (repo.liveUrl) expect(repo.liveUrl).toMatch(/^https:\/\//)
     }
   })
 })
