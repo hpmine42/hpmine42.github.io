@@ -42,6 +42,16 @@ const year = new Date().getFullYear()
   display: inline-flex;
   align-items: center;
   gap: 0.45rem;
+  /* No underline here: the external-link style would draw one. */
+  background-image: none;
+  padding-bottom: 0;
+  transition: color 0.25s var(--ease-out);
+}
+
+.site-footer__link:hover,
+.site-footer__link:focus-visible {
+  background-image: none;
+  color: var(--signal);
 }
 
 .site-footer__mark {
