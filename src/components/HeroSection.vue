@@ -12,7 +12,6 @@ import DotField from './DotField.vue'
         <p class="hero__role">{{ profile.role }}</p>
         <p class="hero__hint">Move your pointer across the name</p>
       </div>
-      <a class="hero__cue" href="#enough">enough.</a>
     </div>
   </section>
 </template>
@@ -32,7 +31,6 @@ import DotField from './DotField.vue'
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
-  justify-content: space-between;
   gap: 0.5rem 2rem;
   max-width: var(--content-max);
   margin-inline: auto;
@@ -64,30 +62,5 @@ import DotField from './DotField.vue'
   line-height: 1.2;
   letter-spacing: -0.015em;
   color: var(--fg);
-}
-
-.hero__cue {
-  display: inline-flex;
-  align-items: center;
-  min-height: 2.75rem;
-  font-size: var(--step--1);
-  color: var(--fg-muted);
-  text-decoration: none;
-  pointer-events: auto;
-  background-image: linear-gradient(currentColor, currentColor);
-  background-repeat: no-repeat;
-  background-position: 0 100%;
-  background-size: 100% 1px;
-  padding-bottom: 0.15em;
-  transition:
-    color 0.25s var(--ease-out),
-    background-size 0.35s var(--ease-out);
-}
-
-.hero__cue:hover,
-.hero__cue:focus-visible {
-  color: var(--fg);
-  background-size: 0 1px;
-  background-position: 100% 100%;
 }
 </style>
