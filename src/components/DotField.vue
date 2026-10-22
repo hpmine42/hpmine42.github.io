@@ -18,8 +18,8 @@ import { useReducedMotion } from '../composables/useReducedMotion'
   dot. The body is evened out over the last few path points, so it reads
   as one clean curve instead of a jittery stroke. When the pointer stops,
   the tail does not freeze: it retracts into the head and the head fades,
-  until nothing is left — moving again grows a fresh tail from the new
-  spot. A tap or click leaves one clearly larger dot that blooms where
+  until nothing is left — moving again unrolls a fresh tail out of the
+  head, growing it back instead of popping it in. A tap or click leaves one clearly larger dot that blooms where
   the pointer went down, then grows and fades again. Dots near the worm
   light up signal blue; the letters of the name lean away noticeably more
   than the rest of the field, but against a stiffer spring and a hard
@@ -92,6 +92,8 @@ const WORM_SPACING = 8
 /** A resting pointer keeps its tail this long, then the tail retracts. */
 const WORM_HOLD_MS = 120
 const WORM_RETRACT_MS = 520
+/** Moving again grows the tail back at this pace instead of popping it in. */
+const WORM_GROW_MS = 260
 /** Body geometry of the last step, shared with draw() so it can be painted. */
 const wormX = new Float32Array(WORM_SEGMENTS)
 const wormY = new Float32Array(WORM_SEGMENTS)
@@ -343,14 +345,23 @@ function step(now: number): void {
   const pressAge = now - press.at
   press.strength = pressAge >= 0 && pressAge < PRESS_MS ? 1 - pressAge / PRESS_MS : 0
 
-  // How much worm is left: full while the pointer moves, then it retracts
-  // over a moment until the field has nothing on it again.
+  // How much worm is left. It is never set straight from one end to the
+  // other: while the pointer moves it grows back (WORM_GROW_MS), and when
+  // the pointer rests it retracts (WORM_RETRACT_MS). That way the tail
+  // unrolls out of the head instead of popping in from nothing.
   const idleFor = now - lastMoveAt
-  wormLife = !pointer.active
-    ? 0
-    : idleFor <= WORM_HOLD_MS
-      ? 1
-      : Math.max(0, 1 - (idleFor - WORM_HOLD_MS) / WORM_RETRACT_MS)
+  const stepDown = dt * (16.667 / WORM_RETRACT_MS)
+  const stepUp = dt * (16.667 / WORM_GROW_MS)
+  if (!pointer.active) {
+    wormLife = Math.max(0, wormLife - stepDown)
+  } else if (idleFor <= WORM_HOLD_MS) {
+    wormLife = Math.min(1, wormLife + stepUp)
+  } else {
+    wormLife = Math.max(0, wormLife - stepDown)
+  }
+  // Once the tail is gone, forget the old route: a new one starts where the
+  // pointer moves next, instead of unrolling the path from before.
+  if (wormLife === 0) wormPath.length = 0
 
   // Follow the pointer closely, with just a little lag.
   if (pointer.active) {
@@ -540,8 +551,8 @@ function step(now: number): void {
 
   if (introStart > 0 && !moving) introStart = 0
   if (press.strength > 0) moving = true
-  // Keep stepping while the tail is still pulling itself in.
-  if (pointer.active && wormLife > 0) moving = true
+  // Keep stepping while the tail is growing or pulling itself in.
+  if (wormLife > 0) moving = true
 
   if (!moving && !displaced) {
     g.dx.fill(0)
@@ -569,7 +580,9 @@ function updatePointer(event: PointerEvent): void {
   const nextY = event.clientY - rect.top
   if (Math.hypot(nextX - pointer.tx, nextY - pointer.ty) > 0.5 || !pointer.active) {
     lastMoveAt = performance.now()
-    wormLife = 1
+    // Not 1: the tail grows back smoothly from its current length. The small
+    // floor keeps the animation loop alive so it can actually do that.
+    wormLife = Math.max(wormLife, 0.05)
   }
   pointer.tx = nextX
   pointer.ty = nextY
