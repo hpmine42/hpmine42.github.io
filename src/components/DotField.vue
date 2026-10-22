@@ -34,9 +34,11 @@ const canvasEl = ref<HTMLCanvasElement | null>(null)
 const reduced = useReducedMotion()
 
 const SPRING = 0.085
-const SPRING_TEXT = 0.16
+// The name is on a looser spring than before: it sways and wobbles with the
+// tail instead of only denting for a moment.
+const SPRING_TEXT = 0.115
 const DAMPING = 0.84
-const DAMPING_TEXT = 0.78
+const DAMPING_TEXT = 0.82
 const TAU = Math.PI * 2
 const FONT_FAMILY = '"Geist Variable", system-ui, sans-serif'
 
@@ -292,8 +294,8 @@ function draw(): void {
       const mag = Math.hypot(g.dx[i] ?? 0, g.dy[i] ?? 0)
       const swell =
         1 +
-        Math.min(mag / (g.spacing * 2.2), 1) * (g.inText[i] === 1 ? 0.55 : 1.1) +
-        (kind === KIND_SIGNAL ? (g.glow[i] ?? 0) * (g.inText[i] === 1 ? 0.5 : 1.35) : 0)
+        Math.min(mag / (g.spacing * 2.2), 1) * (g.inText[i] === 1 ? 0.95 : 1.1) +
+        (kind === KIND_SIGNAL ? (g.glow[i] ?? 0) * (g.inText[i] === 1 ? 0.85 : 1.35) : 0)
       const r =
         (g.inText[i] === 1 ? radiusText : kind === KIND_SIGNAL ? radiusDim * 2.6 : radiusDim) * swell
       c.moveTo(x + r, y)
@@ -436,9 +438,6 @@ function step(now: number): void {
     }
 
     const isText = g.inText[i] === 1
-    // The word reacts clearly when the worm touches it, but still resists
-    // compared to the free field, so the letters stay letters.
-    const give = isText ? 0.9 : 1
     let dx = g.dx[i] ?? 0
     let dy = g.dy[i] ?? 0
     let vx = g.vx[i] ?? 0
@@ -456,7 +455,9 @@ function step(now: number): void {
       const dotY = (g.baseY[i] ?? 0) + dy
       for (let s = 0; s < wormCount; s += 1) {
         const fade = 1 - s / WORM_SEGMENTS
-        const segRadius = 14 + 20 * fade
+        // The letters feel the tail from a little further away, so the whole
+        // word starts to move before the tail actually reaches it.
+        const segRadius = (14 + 20 * fade) * (isText ? 1.18 : 1)
         const ex = dotX - (wormX[s] ?? 0)
         const ey = dotY - (wormY[s] ?? 0)
         const dist = Math.hypot(ex, ey)
@@ -470,9 +471,10 @@ function step(now: number): void {
       }
       wormGlow = best
       if (best > 0) {
-        // Barely any push: the dots should stay where they are and light up,
-        // so the middle of the trail is full instead of being cleared out.
-        const push = best * best * 0.35 * give * dt
+        // The field's own dots mostly just light up — that is what keeps the
+        // trail solid — but the letters of the name are shoved hard, so the
+        // word visibly bends away from the tail and swings back after it.
+        const push = best * best * (isText ? 1.5 : 0.35) * dt
         vx += bestX * push
         vy += bestY * push
       }
@@ -489,15 +491,15 @@ function step(now: number): void {
       const flareRadius = g.spacing * 3.4
       if (dist < flareRadius && dist > 0.01) {
         const f = (1 - dist / flareRadius) * press.strength
-        const push = f * f * 2.4 * give * dt
+        const push = f * f * 2.4 * dt
         vx += (ex / dist) * push
         vy += (ey / dist) * push
         if (f > 0.08) g.glow[i] = Math.max(g.glow[i] ?? 0, f)
       }
     }
 
-    // Text dots sit on a stiffer, more damped spring: they dent and are
-    // back in place quickly, without the wobbly overshoot of the field.
+    // Text dots are a little stiffer than the free field, so they come back
+    // to their place on their own, but loose enough to swing and wobble.
     const spring = isText ? SPRING_TEXT : SPRING
     const damp = isText ? dampingText : damping
     vx = (vx - dx * spring * dt) * damp
@@ -505,10 +507,11 @@ function step(now: number): void {
     dx += vx * dt
     dy += vy * dt
 
-    // Hard cap on travel, tight for text dots (about 3 dot spacings): the
-    // letters can lean away from the pointer but never tear apart. Not
-    // applied during the intro, where dots legitimately start far away.
-    const cap = g.spacing * (isText ? 2.9 : 3.6)
+    // Hard cap on travel (about 3.8 dot spacings for the letters, 3.6 for
+    // the field): the word bends far away from the tail but never tears
+    // apart. Not applied during the intro, where dots legitimately start
+    // far away.
+    const cap = g.spacing * (isText ? 3.8 : 3.6)
     const travel = Math.hypot(dx, dy)
     if (introStart === 0 && travel > cap) {
       dx = (dx / travel) * cap
