@@ -144,7 +144,10 @@ onBeforeUnmount(() => {
         <span class="thread__avatar" aria-hidden="true">T</span>
         <span class="thread__bubble thread__bubble--in">
           <span class="sr-only">{{ PLAIN }}</span>
-          <span aria-hidden="true">{{ shown }}</span>
+          <!-- Invisible copy of the final sentence: it reserves the exact
+               size, so the scrambling text can never change the height. -->
+          <span class="thread__sizer" aria-hidden="true">{{ PLAIN }}</span>
+          <span class="thread__live" aria-hidden="true">{{ shown }}</span>
         </span>
       </div>
     </div>
@@ -206,11 +209,13 @@ onBeforeUnmount(() => {
 }
 
 .thread__bubble {
+  --pad-y: 0.6rem;
+  --pad-x: 0.85rem;
   display: inline-flex;
   align-items: baseline;
   gap: 0.5rem;
   max-width: 100%;
-  padding: 0.6rem 0.85rem;
+  padding: var(--pad-y) var(--pad-x);
   border-radius: 14px;
   font-family: var(--font-mono);
   font-size: 0.9375rem;
@@ -287,7 +292,10 @@ onBeforeUnmount(() => {
 }
 
 .thread__bubble--in {
+  position: relative;
+  display: block;
   min-height: 2.6rem;
+  overflow: hidden;
   border: 1px solid var(--rule);
   background: linear-gradient(180deg, rgba(30, 34, 39, 0.95), rgba(22, 25, 28, 0.95));
   color: var(--fg-muted);
@@ -296,6 +304,20 @@ onBeforeUnmount(() => {
     color 0.45s linear,
     border-color 0.45s linear,
     box-shadow 0.45s linear;
+}
+
+/* The ghost keeps the box at the size of the final sentence; the animated
+   copy sits exactly on top of it. Nothing reflows while it resolves. */
+.thread__sizer {
+  display: block;
+  visibility: hidden;
+}
+
+.thread__live {
+  position: absolute;
+  top: var(--pad-y);
+  left: var(--pad-x);
+  right: var(--pad-x);
 }
 
 .thread[data-phase='done'] .thread__bubble--in {
