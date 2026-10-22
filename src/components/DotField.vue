@@ -10,11 +10,12 @@ import { useReducedMotion } from '../composables/useReducedMotion'
   signal blue as it locks into place (about 2 seconds in total). The
   pointer carries a small worm: a short chain of evenly spaced segments
   that follows the pointer's path like a little animal — straight when
-  you move straight, bending when you turn. It is deliberately plump:
-  a solid bright head on the pointer, a broad body, a long tail, and
-  dots that swell as it passes. The body is evened out over the last few
-  path points, so it reads as one clean curve instead of a jittery
-  stroke. When the pointer stops, the tail does not freeze: it retracts
+  you move straight, bending when you turn. It is a small, solid tail:
+  one continuous filled body that tapers from a round head on the pointer,
+  so nothing in it looks hollow, and the dots underneath only glow along
+  its edge instead of being shovelled aside. The body is evened out over
+  the last few path points, so it reads as one clean curve instead of a
+  jittery stroke. When the pointer stops, the tail does not freeze: it retracts
   into the head and the head fades, until nothing is left — moving again
   grows a fresh tail from the new spot. A tap or click leaves one clearly
   larger dot that blooms where the pointer went down, then grows and
@@ -83,10 +84,14 @@ const pointer = { x: -9999, y: -9999, tx: -9999, ty: -9999, active: false }
     along this path, so the body keeps an even spacing whatever happens. */
 const wormPath: Array<{ x: number; y: number }> = []
 const WORM_SEGMENTS = 18
-const WORM_SPACING = 18
+const WORM_SPACING = 8
 /** A resting pointer keeps its tail this long, then the tail retracts. */
 const WORM_HOLD_MS = 120
-const WORM_RETRACT_MS = 640
+const WORM_RETRACT_MS = 520
+/** Body geometry of the last step, shared with draw() so it can be painted. */
+const wormX = new Float32Array(WORM_SEGMENTS)
+const wormY = new Float32Array(WORM_SEGMENTS)
+let wormCount = 0
 /** A dot that blooms where the pointer was pressed, then grows and fades. */
 const press = { x: 0, y: 0, at: Number.NEGATIVE_INFINITY, strength: 0 }
 const PRESS_MS = 620
@@ -286,7 +291,7 @@ function draw(): void {
       const swell =
         1 +
         Math.min(mag / (g.spacing * 2.2), 1) * (g.inText[i] === 1 ? 0.55 : 1.1) +
-        (kind === KIND_SIGNAL ? (g.glow[i] ?? 0) * 1.45 : 0)
+        (kind === KIND_SIGNAL ? (g.glow[i] ?? 0) * 1.05 : 0)
       const r =
         (g.inText[i] === 1 ? radiusText : kind === KIND_SIGNAL ? radiusDim * 2.15 : radiusDim) * swell
       c.moveTo(x + r, y)
@@ -295,23 +300,45 @@ function draw(): void {
     c.fill()
   }
 
-  // The worm's head: a solid circle right on the pointer, a little larger
-  // than before, wrapped in two soft halos so it reads as a bright lamp
-  // dragging the tail behind it.
-  if (pointer.active && !reduced.value && wormLife > 0.02) {
-    // The head shrinks and dims with the retracting body, so a stopped
-    // pointer leaves an empty field once the tail is gone.
-    const headR = g.spacing * 0.78 * (0.55 + 0.45 * wormLife)
+  // The worm itself: a filled body that tapers from the head to the tip,
+  // painted as one shape. It is solid all the way through — the dots only
+  // glow at its edge — so it never looks like a hollow tube.
+  if (pointer.active && !reduced.value && wormLife > 0.02 && wormCount > 0) {
+    const headR = g.spacing * 0.66 * (0.6 + 0.4 * wormLife)
+    // The body never gets thinner than this, so neighbouring segments still
+    // overlap and the tail stays one solid piece instead of a dotted line.
+    const bodyFloor = WORM_SPACING * 0.62
+    const taper = (index: number): number =>
+      Math.max(bodyFloor, headR * (1 - 0.5 * (index / Math.max(1, WORM_SEGMENTS - 1))))
+
     c.fillStyle = colorSignal
-    c.globalAlpha = 0.16 * wormLife
+    // A soft halo along the whole body.
+    c.globalAlpha = 0.1 * wormLife
     c.beginPath()
-    c.arc(pointer.x, pointer.y, headR * 2.2, 0, TAU)
+    for (let s = 0; s < wormCount; s += 1) {
+      const r = headR * taper(s) * 2.1
+      c.moveTo((wormX[s] ?? 0) + r, wormY[s] ?? 0)
+      c.arc(wormX[s] ?? 0, wormY[s] ?? 0, r, 0, TAU)
+    }
     c.fill()
-    c.globalAlpha = 0.3 * wormLife
+
+    // The body proper.
+    c.globalAlpha = 0.85 * wormLife
     c.beginPath()
-    c.arc(pointer.x, pointer.y, headR * 1.5, 0, TAU)
+    for (let s = 0; s < wormCount; s += 1) {
+      const r = headR * taper(s)
+      c.moveTo((wormX[s] ?? 0) + r, wormY[s] ?? 0)
+      c.arc(wormX[s] ?? 0, wormY[s] ?? 0, r, 0, TAU)
+    }
     c.fill()
-    c.globalAlpha = 0.95 * wormLife
+
+    // The head: solid on the pointer, with one halo.
+    const haloR = headR * 1.7
+    c.globalAlpha = 0.22 * wormLife
+    c.beginPath()
+    c.arc(pointer.x, pointer.y, haloR, 0, TAU)
+    c.fill()
+    c.globalAlpha = 0.96 * wormLife
     c.beginPath()
     c.arc(pointer.x, pointer.y, headR, 0, TAU)
     c.fill()
@@ -371,9 +398,7 @@ function step(now: number): void {
   // segment 0 is the head on the pointer, each next one WORM_SPACING px
   // further back along the route the head actually travelled. Evenly
   // spaced by construction — the body cannot bunch up or overlap itself.
-  const wormX = new Float32Array(WORM_SEGMENTS)
-  const wormY = new Float32Array(WORM_SEGMENTS)
-  let wormCount = 0
+  wormCount = 0
   // Only the part of the body that is still alive gets laid down; the rest
   // of the path simply stays unused, so the tail shortens from the tip.
   const reach = WORM_SPACING * (WORM_SEGMENTS - 1) * wormLife
@@ -442,7 +467,7 @@ function step(now: number): void {
     const isText = g.inText[i] === 1
     // The word reacts clearly when the worm touches it, but still resists
     // compared to the free field, so the letters stay letters.
-    const give = isText ? 0.7 : 1
+    const give = isText ? 0.9 : 1
     let dx = g.dx[i] ?? 0
     let dy = g.dy[i] ?? 0
     let vx = g.vx[i] ?? 0
@@ -460,7 +485,7 @@ function step(now: number): void {
       const dotY = (g.baseY[i] ?? 0) + dy
       for (let s = 0; s < wormCount; s += 1) {
         const fade = 1 - s / WORM_SEGMENTS
-        const segRadius = 15 + 24 * fade
+        const segRadius = 13 + 18 * fade
         const ex = dotX - (wormX[s] ?? 0)
         const ey = dotY - (wormY[s] ?? 0)
         const dist = Math.hypot(ex, ey)
@@ -474,7 +499,7 @@ function step(now: number): void {
       }
       wormGlow = best
       if (best > 0) {
-        const push = best * best * 2.0 * give * dt
+        const push = best * best * 1.15 * give * dt
         vx += bestX * push
         vy += bestY * push
       }
@@ -507,10 +532,10 @@ function step(now: number): void {
     dx += vx * dt
     dy += vy * dt
 
-    // Hard cap on travel, tight for text dots (about 2 dot spacings): the
+    // Hard cap on travel, tight for text dots (about 3 dot spacings): the
     // letters can lean away from the pointer but never tear apart. Not
     // applied during the intro, where dots legitimately start far away.
-    const cap = g.spacing * (isText ? 2.5 : 3.6)
+    const cap = g.spacing * (isText ? 2.9 : 3.6)
     const travel = Math.hypot(dx, dy)
     if (introStart === 0 && travel > cap) {
       dx = (dx / travel) * cap
