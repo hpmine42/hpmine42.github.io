@@ -3,14 +3,16 @@ import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { useReducedMotion } from '../composables/useReducedMotion'
 
 /*
-  The one idea behind enough.: a message travels between exactly two people
-  and is only readable at the end. A packet crosses the line as ciphertext,
-  then the text resolves character by character on arrival.
+  The one idea behind enough., shown as what it is: a chat between two people.
+  The message leaves as noise — the outgoing bubble carries ciphertext — and
+  only becomes readable in the bubble on the other side, character by
+  character, once it has arrived. Plays once when it scrolls into view; the
+  small round button replays it.
 */
 
 const PLAIN = 'less, but enough.'
 const GLYPHS = '0123456789abcdef'
-const TRAVEL_MS = 1500
+const TRAVEL_MS = 1200
 const DECRYPT_MS = 1100
 
 type Phase = 'idle' | 'sending' | 'decrypting' | 'done'
@@ -27,17 +29,29 @@ const reduced = useReducedMotion()
 const root = ref<HTMLElement | null>(null)
 const phase = ref<Phase>('idle')
 const shown = ref(scramble(PLAIN.length))
+const cipher = ref(scramble(24))
 
 let timer = 0
+let churn = 0
 let frame = 0
 let observer: IntersectionObserver | null = null
 
 function clearTimers(): void {
   window.clearTimeout(timer)
+  window.clearInterval(churn)
   cancelAnimationFrame(frame)
 }
 
+function startCipher(): void {
+  window.clearInterval(churn)
+  churn = window.setInterval(() => {
+    if (document.hidden) return
+    cipher.value = scramble(24)
+  }, 110)
+}
+
 function decrypt(): void {
+  window.clearInterval(churn)
   phase.value = 'decrypting'
   const start = performance.now()
   let lastPaint = 0
@@ -67,7 +81,9 @@ function run(): void {
   }
   phase.value = 'idle'
   shown.value = scramble(PLAIN.length)
-  // Two frames, so the packet snaps back to the start before it travels again.
+  cipher.value = scramble(24)
+  startCipher()
+  // Two frames, so the bubbles snap back to their starting state first.
   frame = requestAnimationFrame(() => {
     frame = requestAnimationFrame(() => {
       phase.value = 'sending'
@@ -83,6 +99,7 @@ onMounted(() => {
     ([entry]) => {
       if (!entry?.isIntersecting) return
       observer?.disconnect()
+      observer = null
       run()
     },
     { threshold: 0.6 },
@@ -98,23 +115,39 @@ onBeforeUnmount(() => {
 
 <template>
   <figure ref="root" class="thread" :data-phase="phase">
-    <div class="thread__track" aria-hidden="true">
-      <span class="thread__node" />
-      <span class="thread__line">
-        <span class="thread__fill" />
-        <span class="thread__packet" />
-      </span>
-      <span class="thread__node" />
-    </div>
-    <div class="thread__names" aria-hidden="true">
-      <span>you</span>
-      <span>them</span>
-    </div>
+    <div class="thread__log">
+      <!-- Outgoing: the message as it leaves, nothing but noise. -->
+      <div class="thread__row thread__row--out">
+        <span class="thread__bubble thread__bubble--out" aria-hidden="true">
+          <span class="thread__cipher">{{ cipher }}</span>
+        </span>
+        <span class="thread__tag" aria-hidden="true">
+          <template v-if="phase === 'done'">
+            <svg class="thread__tick" viewBox="0 0 18 12" width="16" height="11" focusable="false">
+              <path
+                d="M1 6.5 4.2 9.5 10 2M7 6.5 10.2 9.5 16 2"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+            delivered
+          </template>
+          <template v-else>encrypted</template>
+        </span>
+      </div>
 
-    <p class="thread__message">
-      <span class="sr-only">{{ PLAIN }}</span>
-      <span aria-hidden="true">{{ shown }}</span>
-    </p>
+      <!-- Incoming: the same message, readable only once it has arrived. -->
+      <div class="thread__row thread__row--in">
+        <span class="thread__avatar" aria-hidden="true">T</span>
+        <span class="thread__bubble thread__bubble--in">
+          <span class="sr-only">{{ PLAIN }}</span>
+          <span aria-hidden="true">{{ shown }}</span>
+        </span>
+      </div>
+    </div>
 
     <figcaption class="thread__caption">
       <span class="thread__status">
@@ -130,13 +163,19 @@ onBeforeUnmount(() => {
         </svg>
         End-to-end encrypted
       </span>
-      <button
-        class="thread__replay"
-        type="button"
-        :hidden="phase !== 'done' || reduced"
-        @click="run"
-      >
-        Replay<span class="sr-only"> the encryption animation</span>
+
+      <button class="thread__replay" type="button" :disabled="reduced" @click="run">
+        <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false">
+          <path
+            d="M13 8a5 5 0 1 1-1.6-3.7M13 2.4V5h-2.6"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.4"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+        </svg>
+        <span class="sr-only">Replay the encryption animation</span>
       </button>
     </figcaption>
   </figure>
@@ -144,107 +183,136 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .thread {
-  padding-bottom: 0.5rem;
+  display: grid;
+  gap: 0.75rem;
 }
 
-.thread__track {
+.thread__log {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.thread__row {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.6rem;
+  min-height: 2.6rem;
+}
+
+.thread__row--out {
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.35rem;
+}
+
+.thread__bubble {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  max-width: 100%;
+  padding: 0.6rem 0.85rem;
+  border-radius: 14px;
+  font-family: var(--font-mono);
+  font-size: 0.9375rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+/* Outgoing: dim, monospace noise, nudged in from the right. */
+.thread__bubble--out {
+  border: 1px solid var(--rule-strong);
+  background: rgba(24, 27, 30, 0.75);
+  color: rgba(138, 162, 255, 0.6);
+  border-bottom-right-radius: 4px;
+  opacity: 0;
+  transform: translateX(0.6rem);
+  transition:
+    opacity 0.3s var(--ease-out),
+    transform 0.35s var(--ease-out),
+    color 0.4s linear;
+}
+
+.thread[data-phase='sending'] .thread__bubble--out,
+.thread[data-phase='decrypting'] .thread__bubble--out,
+.thread[data-phase='done'] .thread__bubble--out {
+  opacity: 1;
+  transform: none;
+}
+
+.thread[data-phase='decrypting'] .thread__bubble--out,
+.thread[data-phase='done'] .thread__bubble--out {
+  color: rgba(138, 162, 255, 0.35);
+}
+
+.thread__cipher {
+  font-size: 0.8125rem;
+  letter-spacing: 0.06em;
+  font-variant-numeric: tabular-nums;
+}
+
+.thread__tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+  white-space: nowrap;
+}
+
+.thread__tag:empty {
+  display: none;
+}
+
+.thread__tick {
+  color: var(--accent);
+}
+
+/* Incoming: starts as noise, resolves into the sentence. */
+.thread__avatar {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  margin-bottom: 0.15rem;
+  border-radius: 50%;
+  border: 1px solid var(--rule-strong);
+  background: rgba(24, 27, 30, 0.85);
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  color: var(--fg-muted);
+}
+
+.thread__bubble--in {
+  min-height: 2.6rem;
+  border: 1px solid var(--rule);
+  background: linear-gradient(180deg, rgba(30, 34, 39, 0.95), rgba(22, 25, 28, 0.95));
+  color: var(--fg-muted);
+  border-bottom-left-radius: 4px;
+  transition:
+    color 0.45s linear,
+    border-color 0.45s linear,
+    box-shadow 0.45s linear;
+}
+
+.thread[data-phase='done'] .thread__bubble--in {
+  color: var(--fg);
+  border-color: rgba(138, 162, 255, 0.45);
+  box-shadow: 0 0 1.75rem -0.35rem rgba(138, 162, 255, 0.45);
+}
+
+.thread__caption {
   display: flex;
   align-items: center;
-}
-
-.thread__node {
-  flex: none;
-  width: 0.75rem;
-  height: 0.75rem;
-  border-radius: 50%;
-  background: var(--fg);
-}
-
-.thread__line {
-  position: relative;
-  flex: 1;
-  height: 1px;
-  background: var(--rule-strong);
-}
-
-/* The travelled part of the line lights up behind the packet. */
-.thread__fill {
-  position: absolute;
-  inset: 0 auto 0 0;
-  width: 0;
-  background: linear-gradient(90deg, transparent, var(--accent));
-  opacity: 0;
-}
-
-.thread[data-phase='sending'] .thread__fill {
-  width: 100%;
-  opacity: 0.8;
-  transition:
-    width 1.5s var(--ease-in-out),
-    opacity 0.2s linear;
-}
-
-.thread[data-phase='decrypting'] .thread__fill,
-.thread[data-phase='done'] .thread__fill {
-  width: 100%;
-  opacity: 0.35;
-  transition: opacity 0.5s linear;
-}
-
-.thread__packet {
-  position: absolute;
-  top: 50%;
-  left: 0;
-  width: 0.5rem;
-  height: 0.5rem;
-  margin-top: -0.25rem;
-  border-radius: 50%;
-  background: var(--accent);
-  opacity: 0;
-  box-shadow:
-    0 0 0.5rem rgba(138, 162, 255, 0.8),
-    0 0 1.5rem rgba(138, 162, 255, 0.45);
-}
-
-.thread[data-phase='sending'] .thread__packet {
-  left: calc(100% - 0.5rem);
-  opacity: 1;
-  transition:
-    left 1.5s var(--ease-in-out),
-    opacity 0.15s linear;
-}
-
-.thread[data-phase='decrypting'] .thread__packet,
-.thread[data-phase='done'] .thread__packet {
-  left: calc(100% - 0.5rem);
-  opacity: 0;
-  transition: opacity 0.4s linear;
-}
-
-.thread__names {
-  display: flex;
   justify-content: space-between;
-  margin-top: 0.6rem;
+  gap: 1rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--rule);
   font-size: var(--step--1);
   color: var(--fg-muted);
-}
-
-.thread__message {
-  min-height: 1.4em;
-  margin-top: clamp(2rem, 5vw, 3.5rem);
-  font-family: var(--font-mono);
-  font-size: clamp(1.25rem, 0.9rem + 1.9vw, 2.125rem);
-  font-weight: 400;
-  line-height: 1.3;
-  letter-spacing: -0.02em;
-  overflow-wrap: anywhere;
-  color: var(--fg-muted);
-  transition: color 0.4s linear;
-}
-
-.thread[data-phase='done'] .thread__message {
-  color: var(--fg);
-  text-shadow: 0 0 1.5rem rgba(138, 162, 255, 0.35);
 }
 
 .thread__status {
@@ -259,31 +327,38 @@ onBeforeUnmount(() => {
   opacity: 0.8;
 }
 
-.thread__caption {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  min-height: 2.75rem;
-  margin-top: 0.75rem;
-  font-size: var(--step--1);
-  color: var(--fg-muted);
-}
-
+/* Always there, just quiet while the animation runs — it never pops in. */
 .thread__replay {
-  min-height: 2.75rem;
-  padding: 0 0.25rem;
-  border: 0;
+  display: inline-grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: 1px solid var(--rule-strong);
+  border-radius: 50%;
   background: none;
-  color: var(--fg);
-  font-size: inherit;
+  color: var(--fg-muted);
   cursor: pointer;
-  text-decoration: underline;
-  text-underline-offset: 0.25em;
-  text-decoration-thickness: 1px;
+  transition:
+    color 0.25s var(--ease-out),
+    border-color 0.25s var(--ease-out),
+    opacity 0.3s linear;
+  opacity: 0.45;
 }
 
-.thread__replay[hidden] {
-  display: none;
+.thread[data-phase='done'] .thread__replay {
+  opacity: 1;
+}
+
+.thread__replay:hover,
+.thread__replay:focus-visible {
+  color: var(--fg);
+  border-color: var(--accent);
+  opacity: 1;
+}
+
+.thread__replay:disabled {
+  cursor: default;
+  opacity: 0.2;
 }
 </style>

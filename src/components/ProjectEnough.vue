@@ -22,15 +22,6 @@ useScrollProgressVar(
   computed(() => !reduced.value),
 )
 
-/* A short cipher string in the window chrome, changing on its own. */
-const HEX = '0123456789abcdef'
-function randomHex(length: number): string {
-  let out = ''
-  for (let i = 0; i < length; i += 1) out += HEX.charAt(Math.floor(Math.random() * HEX.length))
-  return out
-}
-const cipher = ref(randomHex(16))
-let ticker = 0
 let observer: IntersectionObserver | null = null
 
 onMounted(() => {
@@ -49,16 +40,10 @@ onMounted(() => {
     )
     observer.observe(element)
   }
-
-  ticker = window.setInterval(() => {
-    if (document.hidden || reduced.value) return
-    cipher.value = randomHex(16)
-  }, 900)
 })
 
 onBeforeUnmount(() => {
   observer?.disconnect()
-  window.clearInterval(ticker)
 })
 
 /* The demo window leans a little toward the pointer and carries a moving
@@ -153,7 +138,7 @@ function resetPanel(): void {
               <span class="enough__chrome-title">enough. — end-to-end</span>
               <span class="enough__chrome-meta">
                 <span class="enough__chrome-signal" />
-                <span class="enough__cipher">{{ cipher }}</span>
+                1:1 · signal
               </span>
             </div>
             <div class="enough__panel-body">
@@ -533,20 +518,6 @@ function resetPanel(): void {
   61%,
   100% {
     opacity: 0.25;
-  }
-}
-
-/* The cipher is decorative; hide its changing noise from small screens. */
-.enough__cipher {
-  font-size: 0.625rem;
-  letter-spacing: 0.12em;
-  color: rgba(138, 162, 255, 0.65);
-  font-variant-numeric: tabular-nums;
-}
-
-@media (max-width: 30rem) {
-  .enough__cipher {
-    display: none;
   }
 }
 
