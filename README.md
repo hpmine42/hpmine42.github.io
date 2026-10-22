@@ -71,7 +71,7 @@ src/
   styles/base.css              Reset, focus styles, utilities
   composables/                 useReducedMotion, useActiveSection, useScrollProgressVar
   components/
-    SiteHeader.vue             Fixed navigation
+    SiteHeader.vue             Floating, lightly blurred navigation with a sliding section marker
     HeroSection.vue            Hero layout
     DotField.vue               Canvas dot-matrix name with pointer trail
     ProjectEnough.vue          enough. section: selected-project label, highlights, demo panel, GitHub note
