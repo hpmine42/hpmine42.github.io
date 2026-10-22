@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { about, elsewhere, enough, moreRepos, profile, sections } from '../src/data/content'
+import { elsewhere, enough, moreRepos, profile, sections } from '../src/data/content'
 
 describe('content', () => {
   it('marks enough. as the selected project', () => {
@@ -24,13 +24,7 @@ describe('content', () => {
     expect(moreRepos.length).toBeLessThanOrEqual(4)
     for (const repo of moreRepos) {
       expect(repo.url).toMatch(/^https:\/\/github\.com\/hpmine42\//)
-      expect(repo.language.length).toBeGreaterThan(0)
       if (repo.liveUrl) expect(repo.liveUrl).toMatch(/^https:\/\//)
     }
-  })
-
-  it('keeps the about sentence to one line of text', () => {
-    expect(about.length).toBeGreaterThan(40)
-    expect(about.length).toBeLessThan(140)
   })
 })

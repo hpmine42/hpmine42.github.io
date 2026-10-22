@@ -64,7 +64,6 @@ export const elsewhere = {
 export interface RepoCard {
   readonly label: string
   readonly repo: string
-  readonly language: string
   readonly url: string
   readonly liveUrl?: string
 }
@@ -75,29 +74,22 @@ export const moreRepos: readonly RepoCard[] = [
   {
     label: 'JSON Opener',
     repo: 'json-opener-on-android-',
-    language: 'JavaScript',
     url: 'https://github.com/hpmine42/json-opener-on-android-',
     liveUrl: 'https://hpmine42.github.io/json-opener-on-android-/',
   },
   {
     label: 'Minecraft clone',
     repo: 'Minecraft-Klon',
-    language: 'JavaScript',
     url: 'https://github.com/hpmine42/Minecraft-Klon',
     liveUrl: 'https://hpmine42.github.io/Minecraft-Klon/',
   },
   {
     label: 'Stopwatch',
     repo: 'Stopwatch',
-    language: 'HTML',
     url: 'https://github.com/hpmine42/Stopwatch',
     liveUrl: 'https://stopwatch-hpmine.vercel.app',
   },
 ]
-
-/* One sentence about the person behind the page. */
-export const about =
-  'I build small, private web tools in TypeScript and Vue, and keep the code open so anyone can check it.'
 
 export interface NavItem {
   readonly id: string

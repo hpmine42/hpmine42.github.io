@@ -166,18 +166,19 @@ function resetPanel(): void {
           <p class="enough__elsewhere-text">{{ elsewhere.text }}</p>
 
           <ul class="enough__repos">
-            <li v-for="repo in moreRepos" :key="repo.repo">
+            <li v-for="(repo, index) in moreRepos" :key="repo.repo">
               <a
                 class="enough__repo"
                 :href="repo.liveUrl ?? repo.url"
                 target="_blank"
                 rel="noopener noreferrer"
               >
-                <span class="enough__repo-name">{{ repo.label }}</span>
-                <span class="enough__repo-meta">
-                  <span class="enough__repo-lang">{{ repo.language }}</span>
-                  <span v-if="repo.liveUrl" class="enough__repo-live">live</span>
-                  <span v-else class="enough__repo-live enough__repo-live--repo">repo</span>
+                <span class="enough__repo-top">
+                  <span class="enough__repo-name">{{ repo.label }}</span>
+                  <span class="enough__repo-arrow" aria-hidden="true">↗</span>
+                </span>
+                <span class="enough__repo-index" aria-hidden="true">
+                  {{ String(index + 1).padStart(2, '0') }}
                 </span>
                 <span class="sr-only"> (opens in a new tab)</span>
               </a>
@@ -559,72 +560,91 @@ function resetPanel(): void {
 /* The small projects next to the GitHub note. */
 .enough__repos {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
-  gap: 0.6rem;
-  margin-top: clamp(1.25rem, 3vw, 1.75rem);
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  column-gap: clamp(1.25rem, 3vw, 2rem);
+  margin-top: clamp(1.5rem, 3vw, 2rem);
+  border-top: 1px solid var(--rule);
 }
 
+/*
+  The small projects are a quiet list of names: no language, no status, no
+  badges. On hover the name slides a little, the arrow steps out and a thin
+  signal line grows in from the left.
+*/
 .enough__repo {
+  position: relative;
   display: grid;
-  gap: 0.35rem;
-  padding: 0.7rem 0.8rem;
-  border: 1px solid var(--rule);
-  border-radius: 6px;
-  background: rgba(18, 20, 22, 0.55);
+  gap: 0.55rem;
+  padding: 0.75rem 0.15rem 0.75rem 0;
+  border-bottom: 1px solid var(--rule);
   color: var(--fg);
   text-decoration: none;
-  transition:
-    border-color 0.3s var(--ease-out),
-    background-color 0.3s var(--ease-out),
-    transform 0.3s var(--ease-out);
+  transition: color 0.3s var(--ease-out);
 }
 
-.enough__repo:hover,
-.enough__repo:focus-visible {
-  border-color: rgba(138, 162, 255, 0.45);
-  background: rgba(28, 32, 37, 0.75);
-  transform: translateY(-1px);
+.enough__repo::before {
+  content: '';
+  position: absolute;
+  inset: auto 0 -1px 0;
+  height: 1px;
+  background: var(--accent);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.4s var(--ease-out);
+}
+
+.enough__repo:hover::before,
+.enough__repo:focus-visible::before {
+  transform: scaleX(1);
+}
+
+.enough__repo-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
 }
 
 .enough__repo-name {
-  font-size: var(--step--1);
+  font-size: var(--step-0);
   font-weight: 550;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.015em;
+  transition: transform 0.35s var(--ease-out);
 }
 
-.enough__repo-meta {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
+.enough__repo:hover .enough__repo-name,
+.enough__repo:focus-visible .enough__repo-name {
+  transform: translateX(0.2rem);
+}
+
+.enough__repo-arrow {
+  flex: none;
+  font-size: 0.875rem;
+  color: var(--fg-muted);
+  transform: translate(-0.15rem, 0.15rem);
+  transition:
+    transform 0.35s var(--ease-out),
+    color 0.3s var(--ease-out);
+}
+
+.enough__repo:hover .enough__repo-arrow,
+.enough__repo:focus-visible .enough__repo-arrow {
+  color: var(--accent);
+  transform: translate(0.1rem, -0.1rem);
+}
+
+.enough__repo-index {
   font-family: var(--font-mono);
   font-size: 0.6875rem;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  letter-spacing: 0.1em;
   color: var(--fg-muted);
+  opacity: 0.6;
+  transition: opacity 0.3s var(--ease-out);
 }
 
-.enough__repo-lang::before {
-  content: '';
-  display: inline-block;
-  width: 0.4rem;
-  height: 0.4rem;
-  margin-right: 0.35rem;
-  border-radius: 50%;
-  background: var(--accent);
-  vertical-align: 0.05em;
-}
-
-.enough__repo-live {
-  margin-left: auto;
-  padding: 0.1rem 0.35rem;
-  border: 1px solid rgba(138, 162, 255, 0.35);
-  border-radius: 3px;
-  color: rgba(138, 162, 255, 0.85);
-}
-
-.enough__repo-live--repo {
-  border-color: var(--rule-strong);
-  color: var(--fg-muted);
+.enough__repo:hover .enough__repo-index,
+.enough__repo:focus-visible .enough__repo-index {
+  opacity: 1;
 }
 
 /* The door to GitHub. */
