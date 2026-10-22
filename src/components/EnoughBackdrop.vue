@@ -310,6 +310,7 @@ onBeforeUnmount(() => {
       class="backdrop__light"
       :style="{ '--light-radius': `${LIGHT_RADIUS}px` }"
     />
+    <div class="backdrop__scan" />
     <div class="backdrop__vignette" />
   </div>
 </template>
@@ -356,6 +357,38 @@ onBeforeUnmount(() => {
   mix-blend-mode: screen;
   opacity: 0;
   will-change: transform, opacity;
+}
+
+/* A slow scan line travelling down the field, like a CRT sweep. */
+.backdrop__scan {
+  position: absolute;
+  inset: -20% 0 auto 0;
+  z-index: 2;
+  height: 18%;
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    rgba(138, 162, 255, 0.05) 45%,
+    rgba(138, 162, 255, 0.1) 50%,
+    rgba(138, 162, 255, 0.05) 55%,
+    transparent
+  );
+  animation: backdrop-scan 11s linear infinite;
+}
+
+@keyframes backdrop-scan {
+  0% {
+    transform: translateY(-30%);
+  }
+  100% {
+    transform: translateY(760%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .backdrop__scan {
+    display: none;
+  }
 }
 
 .backdrop__vignette {
