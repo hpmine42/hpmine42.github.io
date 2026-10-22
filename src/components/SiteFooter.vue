@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { about, profile } from '../data/content'
+import { profile } from '../data/content'
 import ExternalLink from './ExternalLink.vue'
 import GitHubMark from './GitHubMark.vue'
 
@@ -8,7 +8,6 @@ const year = new Date().getFullYear()
 
 <template>
   <footer class="site-footer">
-    <p class="site-footer__about">{{ about }}</p>
     <div class="site-footer__inner">
       <p class="site-footer__name">{{ profile.name }}</p>
       <ExternalLink class="site-footer__link" :href="profile.githubUrl">
@@ -27,12 +26,6 @@ const year = new Date().getFullYear()
   background: var(--bg);
   color: var(--fg);
   font-size: var(--step--1);
-}
-
-.site-footer__about {
-  max-width: 46ch;
-  margin-bottom: clamp(1.25rem, 3vw, 1.75rem);
-  color: var(--fg-muted);
 }
 
 .site-footer__inner {
