@@ -566,6 +566,50 @@ function step(now: number): void {
   if (moving) frame = requestAnimationFrame(step)
 }
 
+/*
+  Drops everything that is only alive while the loop runs: the trail, the
+  head, a press bloom that has not faded yet and any displaced dots. Without
+  this, stopping the loop (canvas scrolled out of view, tab hidden) would
+  leave those dots frozen on screen until the pointer moved again.
+*/
+function settleField(): void {
+  pointer.active = false
+  pointer.x = -9999
+  pointer.y = -9999
+  pointer.tx = -9999
+  pointer.ty = -9999
+  wormPath.length = 0
+  wormLife = 0
+  wormCount = 0
+  press.strength = 0
+  press.at = Number.NEGATIVE_INFINITY
+  introStart = 0
+  const g = grid
+  if (!g) return
+  g.dx.fill(0)
+  g.dy.fill(0)
+  g.vx.fill(0)
+  g.vy.fill(0)
+  g.glow.fill(0)
+  g.delay.fill(-1)
+}
+
+/** A hidden tab freezes requestAnimationFrame; settle instead of freezing. */
+function onDocumentHidden(): void {
+  if (disposed) return
+  if (document.hidden) {
+    if (frame !== 0) {
+      cancelAnimationFrame(frame)
+      frame = 0
+    }
+    settleField()
+    if (visible) draw()
+    return
+  }
+  // Back in the foreground: repaint and finish anything that was moving.
+  if (visible) kick()
+}
+
 function kick(): void {
   if (frame !== 0 || reduced.value || !visible || !grid) return
   lastTime = performance.now()
@@ -649,18 +693,35 @@ onMounted(async () => {
   host.addEventListener('pointerdown', pressPointer)
   host.addEventListener('pointerleave', releasePointer)
   host.addEventListener('pointercancel', releasePointer)
+  // Touch: the finger lifting ends the gesture, so the tail starts to pull
+  // itself in right away instead of waiting for a pointerleave that never
+  // comes.
+  host.addEventListener('pointerup', releasePointer)
 
   resizeObserver = new ResizeObserver(scheduleRebuild)
   resizeObserver.observe(host)
 
   visibilityObserver = new IntersectionObserver(([entry]) => {
     visible = entry?.isIntersecting ?? true
-    if (visible) draw()
-    else if (frame !== 0) {
+    if (visible) {
+      // Back on screen: paint the settled field and let anything that is
+      // still moving finish.
+      draw()
+      kick()
+      return
+    }
+    // Leaving the screen: stop the loop, but first drop the transient state
+    // so no frozen trail, head or press dot is left behind.
+    if (frame !== 0) {
       cancelAnimationFrame(frame)
       frame = 0
     }
+    settleField()
+    draw()
   })
+
+  // A hidden tab stops requestAnimationFrame as well; settle on the way out.
+  document.addEventListener('visibilitychange', onDocumentHidden)
   visibilityObserver.observe(canvas)
 })
 
@@ -674,6 +735,8 @@ onBeforeUnmount(() => {
   host?.removeEventListener('pointerdown', pressPointer)
   host?.removeEventListener('pointerleave', releasePointer)
   host?.removeEventListener('pointercancel', releasePointer)
+  host?.removeEventListener('pointerup', releasePointer)
+  document.removeEventListener('visibilitychange', onDocumentHidden)
 })
 </script>
 
