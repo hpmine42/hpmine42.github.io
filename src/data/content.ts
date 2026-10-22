@@ -93,12 +93,6 @@ export const moreRepos: readonly RepoCard[] = [
     url: 'https://github.com/hpmine42/Stopwatch',
     liveUrl: 'https://stopwatch-hpmine.vercel.app',
   },
-  {
-    label: 'Panorama',
-    repo: 'Panorama',
-    language: 'TypeScript',
-    url: 'https://github.com/hpmine42/Panorama',
-  },
 ]
 
 /* One sentence about the person behind the page. */
