@@ -7,6 +7,7 @@ import EnoughBackdrop from './EnoughBackdrop.vue'
 import EnoughThread from './EnoughThread.vue'
 import ExternalLink from './ExternalLink.vue'
 import FactList from './FactList.vue'
+import GitHubMark from './GitHubMark.vue'
 
 const reduced = useReducedMotion()
 const word = ref<HTMLElement | null>(null)
@@ -81,6 +82,7 @@ useScrollProgressVar(
         </div>
 
         <ExternalLink class="enough__elsewhere-link" :href="elsewhere.url" variant="button">
+          <GitHubMark class="enough__elsewhere-mark" />
           <span>{{ elsewhere.label }}</span>
           <svg class="enough__arrow" viewBox="0 0 20 20" width="18" height="18" aria-hidden="true" focusable="false">
             <path
@@ -359,6 +361,11 @@ useScrollProgressVar(
 .enough__elsewhere-link {
   flex: none;
   gap: 0.6rem;
+}
+
+.enough__elsewhere-mark {
+  width: 1.05rem;
+  height: 1.05rem;
 }
 
 .enough__arrow {
