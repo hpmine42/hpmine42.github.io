@@ -76,11 +76,6 @@ export const moreRepos: readonly RepoCard[] = [
     url: 'https://github.com/hpmine42/json-opener-on-android-',
   },
   {
-    label: 'Minecraft clone',
-    repo: 'Minecraft-Klon',
-    url: 'https://github.com/hpmine42/Minecraft-Klon',
-  },
-  {
     label: 'Stopwatch',
     repo: 'Stopwatch',
     url: 'https://github.com/hpmine42/Stopwatch',
