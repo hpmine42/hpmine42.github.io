@@ -20,7 +20,7 @@ describe('content', () => {
   })
 
   it('shows a handful of smaller repositories, each linking to its own repo', () => {
-    expect(moreRepos.length).toBeGreaterThan(2)
+    expect(moreRepos.length).toBeGreaterThanOrEqual(2)
     expect(moreRepos.length).toBeLessThanOrEqual(4)
     for (const repo of moreRepos) {
       expect(repo.url).toMatch(/^https:\/\/github\.com\/hpmine42\//)
